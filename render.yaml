@@ -1,39 +1,13 @@
 services:
-  # ─────────────── Backend (FastAPI) ───────────────
   - type: web
     name: signal-scale
     runtime: python3
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn api.app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
-    healthCheckPath: /healthz
     envVars:
       - key: ENV
         value: production
-      - key: APP_NAME
-        value: Signal & Scale API
-      # 🔐 Add this in Render dashboard, not in git
       - key: OPENAI_API_KEY
         sync: false
-      # CORS controls:
-      # While debugging CORS, set ALLOW_ALL_ORIGINS="true".
-      # After verified, set it to "false" and keep ALLOWED_ORIGINS below.
-      - key: ALLOW_ALL_ORIGINS
-        value: "true"
-      - key: ALLOWED_ORIGINS
-        value: https://signal-scale-frontend.onrender.com,http://localhost:5173
-      # Optional DB (remove if not used)
-      - key: DATABASE_URL
-        value: sqlite:///./signal_scale.db
-
-  # ─────────────── Frontend (Vite) ───────────────
-  - type: static
-    name: signal-scale-frontend
-    buildCommand: |
-      if command -v pnpm >/dev/null 2>&1; then pnpm i --frozen-lockfile && pnpm build;
-      elif command -v npm >/dev/null 2>&1; then npm ci && npm run build;
-      else yarn install --frozen-lockfile && yarn build; fi
-    staticPublishPath: dist
-    envVars:
-      # 👇 This is what your React app reads in utils.js
-      - key: VITE_API_URL
-        value: https://signal-scale.onrender.com
+      - key: FRONTEND_URL
+        value: https://signal-scale-frontend.onrender.com
