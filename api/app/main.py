@@ -2,6 +2,9 @@
 from datetime import datetime
 from typing import Any, Dict
 from fastapi import Body
+import sys
+print("[startup] cwd:", os.getcwd())
+print("[startup] sys.path:", sys.path[:5])  # first few entries
 
 @app.post("/api/intelligence/analyze")
 async def intelligence_analyze(payload: Dict[str, Any] = Body(...)):
