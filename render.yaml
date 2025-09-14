@@ -3,7 +3,8 @@ services:
     name: signal-scale
     runtime: python3
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn api.app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
+    startCommand: gunicorn server:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
+
     envVars:
       - key: ENV
         value: production
