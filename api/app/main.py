@@ -1,143 +1,61 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, PlainTextResponse
-from datetime import datetime
-import logging
 import os
-from .models import AnalysisRequest, ExportRequest
-from .agents.cultural_radar import run_cultural_radar
-from .agents.competitive_playbook import run_competitive_playbook
-from .agents.dtc_audit import run_dtc_audit
-from .services.exporter import export_html, export_markdown
-from .db import ping, init_db
-from .settings import settings
+import sys
+# DON'T CHANGE THIS !!!
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from flask import Flask, send_from_directory
+from flask_cors import CORS
+from src.models.user import db
+from src.models.brand import Brand
+from src.models.competitor import Competitor
+from src.models.cultural_radar_data import CulturalRadarData
+from src.models.competitive_playbook_data import CompetitivePlaybookData
+from src.models.dtc_audit_data import DTCAuditData
+from src.routes.user import user_bp
+from src.routes.brands import brands_bp
+from src.routes.intelligence import intelligence_bp
+from src.routes.payments import payments_bp
+from src.routes.brands_enhanced import brands_enhanced_bp
+from src.routes.ai_intelligence import ai_intelligence_bp
+from src.routes.real_intelligence_api import real_intelligence_bp
 
-app = FastAPI(
-    title="Signal & Scale API",
-    description="AI-powered competitive intelligence platform",
-    version="1.0.0",
-    docs_url="/docs" if settings.ENV == "development" else None,
-    redoc_url="/redoc" if settings.ENV == "development" else None,
-)
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
+app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
 
-# CORS middleware
-origins = ["*"] if settings.ENV == "development" else [
-    "https://signal-scale.onrender.com",
-    "https://your-frontend-domain.com"
-]
+# Enable CORS for all routes
+CORS(app)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.register_blueprint(user_bp, url_prefix='/api')
+app.register_blueprint(brands_bp, url_prefix='/api')
+app.register_blueprint(intelligence_bp, url_prefix='/api')
+app.register_blueprint(payments_bp, url_prefix='/api')
+app.register_blueprint(brands_enhanced_bp, url_prefix='/api')
+app.register_blueprint(ai_intelligence_bp)
+app.register_blueprint(real_intelligence_bp)
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    try:
-        init_db()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+# uncomment if you need to use database
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
+with app.app_context():
+    db.create_all()
 
-@app.get("/")
-async def root():
-    return {
-        "name": settings.APP_NAME,
-        "version": "1.0.0",
-        "status": "operational",
-        "environment": settings.ENV,
-        "timestamp": datetime.now().isoformat(),
-        "docs_url": "/docs" if settings.ENV == "development" else "disabled"
-    }
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    static_folder_path = app.static_folder
+    if static_folder_path is None:
+            return "Static folder not configured", 404
 
-@app.get("/healthz")
-async def health_check():
-    try:
-        ping()
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "environment": settings.ENV,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
-
-@app.post("/api/run/cultural_radar")
-async def cultural_radar_analysis(request: AnalysisRequest):
-    try:
-        brand_dict = request.brand.dict()
-        competitors_list = [c.dict() for c in request.competitors]
-        analysis = await run_cultural_radar(brand_dict, competitors_list)
-        
-        return {
-            "agent": "Cultural Radar v3.0",
-            "brand": brand_dict,
-            "competitors": competitors_list,
-            "generated_at": datetime.now().isoformat(),
-            "analysis": analysis
-        }
-    except Exception as e:
-        logger.error(f"Cultural radar analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-
-@app.post("/api/run/competitive_playbook")
-async def competitive_playbook_analysis(request: AnalysisRequest):
-    try:
-        brand_dict = request.brand.dict()
-        competitors_list = [c.dict() for c in request.competitors]
-        analysis = await run_competitive_playbook(brand_dict, competitors_list)
-        
-        return {
-            "agent": "Competitive Playbook v3.2",
-            "brand": brand_dict,
-            "competitors": competitors_list,
-            "generated_at": datetime.now().isoformat(),
-            "analysis": analysis
-        }
-    except Exception as e:
-        logger.error(f"Competitive playbook analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-
-@app.post("/api/run/dtc_audit")
-async def dtc_audit_analysis(request: AnalysisRequest):
-    try:
-        brand_dict = request.brand.dict()
-        competitors_list = [c.dict() for c in request.competitors]
-        analysis = await run_dtc_audit(brand_dict, competitors_list)
-        
-        return {
-            "agent": "DTC Audit v2.1",
-            "brand": brand_dict,
-            "competitors": competitors_list,
-            "generated_at": datetime.now().isoformat(),
-            "analysis": analysis
-        }
-    except Exception as e:
-        logger.error(f"DTC audit analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-
-@app.post("/api/export")
-async def export_report(request: ExportRequest):
-    try:
-        if request.format == "html":
-            content = export_html(request.payload)
-            return HTMLResponse(content=content)
+    if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
+        return send_from_directory(static_folder_path, path)
+    else:
+        index_path = os.path.join(static_folder_path, 'index.html')
+        if os.path.exists(index_path):
+            return send_from_directory(static_folder_path, 'index.html')
         else:
-            content = export_markdown(request.payload)
-            return PlainTextResponse(content=content)
-    except Exception as e:
-        logger.error(f"Export failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+            return "index.html not found", 404
 
-@app.get("/ping")
-async def ping_endpoint():
-    return {"status": "pong"}
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
