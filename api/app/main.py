@@ -1,45 +1,34 @@
 # api/app/main.py
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .routers.intelligence import router as intelligence_router
 
-# --- Import routers (keep if these files exist) ---
-try:
-    from .routers.intelligence import router as intelligence_router
-except Exception as e:
-    intelligence_router = None
-    print("[warn] intelligence router not loaded:", e)
+app = FastAPI(
+    title="Signal & Scale API",
+    version="1.0.0",
+    docs_url="/docs",
+    openapi_url="/openapi.json",
+)
 
-app = FastAPI(title="Signal & Scale API", version="1.0.0")
-
-# --- CORS (allow your Render frontend) ---
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "https://signal-scale-frontend.onrender.com")
-allowed_origins = [
-    frontend_origin,
+# Allow your Render frontend + localhost
+ALLOWED_ORIGINS = [
+    "https://signal-scale-frontend.onrender.com",
+    "https://signal-scale.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.get("/healthz")
-def healthz():
-    return {
-        "name": "Signal & Scale",
-        "status": "ok",
-        "env": os.getenv("ENV", "development"),
-    }
+def health():
+    return {"status": "ok"}
 
-# Mount routers if available
-if intelligence_router:
-    app.include_router(intelligence_router, prefix="/api")
-
-# Root
-@app.get("/")
-def root():
-    return {"message": "Signal & Scale API is running."}
+# Mount your API under /api
+app.include_router(intelligence_router, prefix="/api")
