@@ -1,21 +1,13 @@
-from pydantic_settings import BaseSettings
-from typing import Optional
+# api/app/settings.py
+
 import os
+from pydantic import BaseSettings
 
 class Settings(BaseSettings):
-    APP_NAME: str = "Signal & Scale API"
-    ENV: str = "development"
-    
-    # Database
-    DATABASE_URL: str = "sqlite:///./signal_scale.db"
-    
-    # API Keys
-    OPENAI_API_KEY: Optional[str] = None
-    
-    # Server
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
-    
+    ENV: str = os.getenv("ENV", "development")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
     class Config:
         env_file = ".env"
         case_sensitive = True
