@@ -1,59 +1,37 @@
-import httpx
+# api/app/services/openai_client.py
 import json
+import httpx
 from ..settings import settings
 
-async def get_completion(prompt: str, model: str = "gpt-4o-mini") -> dict:
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+
+def _headers():
+    return {
+        "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+async def get_completion(messages, model: str = "gpt-4o-mini", temperature: float = 0.2):
+    """
+    Thin async wrapper around OpenAI's chat completions.
+    messages = [{"role":"system","content":"..."},{"role":"user","content":"..."}]
+    Returns parsed JSON from OpenAI.
+    """
+    # Safe fallback if no key set — returns a mock payload so UI won't crash
     if not settings.OPENAI_API_KEY:
         return {
-            "analysis": {
-                "status": "mock_response",
-                "message": "Set OPENAI_API_KEY for real AI analysis",
-                "executive_summary": {
-                    "key_opportunities": [
-                        "Mobile experience optimization (+35% conversion potential)",
-                        "Content marketing strategy development",
-                        "Community building initiatives"
-                    ],
-                    "competitive_gaps": [
-                        "Social media engagement vs competitors",
-                        "Mobile-first design implementation"
-                    ]
-                },
-                "recommendations": [
-                    {
-                        "action": "Implement mobile-first design strategy",
-                        "priority": "High",
-                        "effort": "Medium",
-                        "roi_potential": "High",
-                        "timeline": "30-60 days"
-                    }
-                ]
-            }
+            "choices": [
+                {"message": {"content": json.dumps({"mock": True, "note": "Set OPENAI_API_KEY to enable real outputs."})}}
+            ]
         }
-    
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {settings.OPENAI_API_KEY}"
-                },
-                json={
-                    "model": model,
-                    "max_tokens": 2000,
-                    "temperature": 0.7,
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-            )
-            response.raise_for_status()
-            data = response.json()
-            content = data["choices"][0]["message"]["content"]
-            
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return {"analysis": {"raw_response": content}}
-                
-    except Exception as e:
-        return {"analysis": {"error": str(e), "status": "api_error"}}
+
+    payload = {"model": model, "temperature": temperature, "messages": messages}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(OPENAI_URL, headers=_headers(), json=payload)
+        r.raise_for_status()
+        return r.json()
+
+# Optional alias if other modules expect `chat(...)`
+async def chat(messages, model: str = "gpt-4o-mini", temperature: float = 0.2):
+    return await get_completion(messages, model=model, temperature=temperature)
+
