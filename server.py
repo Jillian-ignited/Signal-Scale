@@ -1,8 +1,15 @@
-# server.py (repo root)
-import os, sys
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+# server.py  (repo root)
+import os
+import sys
 
-from api.app.main import app  # import the FastAPI app
-print("[server.py] ready")
+# Ensure the repo root is on sys.path so "api.app.main" is importable
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+# Optional: sanity log to confirm working dir in Render logs
+print("[server] cwd:", os.getcwd())
+print("[server] sys.path[0]:", sys.path[0])
+
+# Import your FastAPI app
+from api.app.main import app  # <-- do not change this if your app is in api/app/main.py
