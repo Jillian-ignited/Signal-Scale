@@ -5,6 +5,21 @@ from fastapi import Body
 import sys
 print("[startup] cwd:", os.getcwd())
 print("[startup] sys.path:", sys.path[:5])  # first few entries
+from fastapi.middleware.cors import CORSMiddleware
+
+ALLOWED_ORIGINS = [
+    "https://signal-scale-frontend.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/api/intelligence/analyze")
 async def intelligence_analyze(payload: Dict[str, Any] = Body(...)):
