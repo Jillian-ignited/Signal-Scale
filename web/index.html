@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Signal & Scale – Cultural & Competitive Reports</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .tab-active { border-bottom: 2px solid black; font-weight: 700; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+  </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900">
+  <div class="max-w-6xl mx-auto p-6">
+    <header class="flex items-center justify-between gap-4">
+      <h1 class="text-2xl sm:text-3xl font-bold">Signal & Scale</h1>
+      <div class="flex items-center gap-3">
+        <button id="exportHtml" class="px-3 py-2 rounded bg-black text-white text-sm">Export HTML</button>
+        <button id="exportJson" class="px-3 py-2 rounded bg-white border text-sm">Export JSON</button>
+      </div>
+    </header>
+
+    <!-- Notice -->
+    <div class="mt-4 p-3 bg-amber-100 border border-amber-200 rounded text-sm">
+      Set your API URL in the code (look for <code>API_BASE</code> in the script) before deploying. You can change it later.
+    </div>
+
+    <!-- Tabs -->
+    <nav class="mt-6 flex gap-6 text-sm">
+      <button class="tab tab-active" data-tab="cultural">Cultural Radar</button>
+      <button class="tab" data-tab="competitive">Competitive Playbook</button>
+      <button class="tab" data-tab="dtc">DTC Audit</button>
+    </nav>
+
+    <!-- Forms -->
+    <section id="form-culture" class="mt-6 grid sm:grid-cols-2 gap-6">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium">Brand Name</label>
+          <input id="brandName" class="w-full mt-1 border rounded px-3 py-2" placeholder="Crooks & Castles" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Brand URL</label>
+          <input id="brandUrl" class="w-full mt-1 border rounded px-3 py-2" placeholder="https://example.com" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Competitors (one per line, format: Name|https://url)</label>
+          <textarea id="competitors" rows="4" class="w-full mt-1 border rounded px-3 py-2" placeholder="Reason|https://www.reasonclothing.com&#10;The Hundreds|https://thehundreds.com"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium">Start Date</label>
+            <input id="startDate" type="date" class="w-full mt-1 border rounded px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">End Date</label>
+            <input id="endDate" type="date" class="w-full mt-1 border rounded px-3 py-2" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium">Primary Goal</label>
+            <select id="primaryGoal" class="w-full mt-1 border rounded px-3 py-2">
+              <option value="conversion">Conversion</option>
+              <option value="awareness">Awareness</option>
+              <option value="retention">Retention</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Budget Tier</label>
+            <select id="budgetTier" class="w-full mt-1 border rounded px-3 py-2">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button id="runCultural" class="px-4 py-2 rounded bg-black text-white">Run Cultural Radar</button>
+          <button id="runCompetitive" class="px-4 py-2 rounded border">Run Competitive</button>
+          <button id="runDtc" class="px-4 py-2 rounded border">Run DTC Audit</button>
+        </div>
+        <p class="text-xs text-zinc-500">Results appear on the right. You can export to HTML/JSON at any time.</p>
+      </div>
+
+      <div class="bg-white border rounded p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-semibold">Report Output</h2>
+          <span id="status" class="text-xs text-zinc-500">Idle</span>
+        </div>
+        <pre id="output" class="text-xs overflow-auto h-[520px]"></pre>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // 🔧 1) SET YOUR API URL HERE (copy from Render service, e.g., https://signal-scale-api.onrender.com)
+    const API_BASE = "https://YOUR-API-URL.onrender.com"; // <-- EDIT THIS LINE
+
+    // UI helpers
+    const $ = (id) => document.getElementById(id);
+    const output = $("output");
+    const statusEl = $("status");
+
+    function parseCompetitors(raw) {
+      return raw.split("\n").map(l => l.trim()).filter(Boolean).map(row => {
+        const [name, url] = row.split("|");
+        return { name: (name||"").trim(), url: (url||"").trim() };
+      });
+    }
+
+    function payloadFromForm() {
+      return {
+        brand: {
+          name: $("brandName").value || "Test Brand",
+          url: $("brandUrl").value || "https://example.com",
+          category: "apparel",
+          target_customer: "18–34",
+          primary_goal: $("primaryGoal").value || "conversion",
+          budget_tier: $("budgetTier").value || "medium"
+        },
+        competitors: parseCompetitors($("competitors").value),
+        window: {
+          start: $("startDate").value || "2025-09-01",
+          end: $("endDate").value || "2025-09-13"
+        }
+      };
+    }
+
+    async function callApi(path, body) {
+      statusEl.textContent = "Running…";
+      output.textContent = "";
+      try {
+        const res = await fetch(`${API_BASE}${path}`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+        statusEl.textContent = res.ok ? "Done" : "Error";
+      } catch (e) {
+        output.textContent = "Request failed. Check API URL and CORS.\n\n" + e;
+        statusEl.textContent = "Error";
+      }
+    }
+
+    // Wire buttons → endpoints (adjust paths to match your API)
+    $("runCultural").addEventListener("click", () => callApi("/api/run/cultural_radar", payloadFromForm()));
+    $("runCompetitive").addEventListener("click", () => callApi("/competitive", payloadFromForm()));
+    $("runDtc").addEventListener("click", () => callApi("/dtc-audit", payloadFromForm()));
+
+    // Exports
+    function download(filename, text, type="text/plain") {
+      const blob = new Blob([text], {type});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    $("exportJson").addEventListener("click", () => {
+      const txt = output.textContent || "{}";
+      download(`signal-scale-report-${Date.now()}.json`, txt, "application/json");
+    });
+
+    $("exportHtml").addEventListener("click", () => {
+      let data;
+      try { data = JSON.parse(output.textContent); } catch { data = { raw: output.textContent }; }
+      const html = `
+<!doctype html><html><head>
+<meta charset="utf-8" />
+<title>Signal & Scale Report</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;margin:40px;color:#111}
+  h1,h2{margin:0 0 8px}
+  .muted{color:#666}
+  .card{border:1px solid #eee;border-radius:12px;padding:16px;margin:12px 0}
+  pre{white-space:pre-wrap;word-wrap:break-word}
+</style>
+</head><body>
+  <h1>Signal & Scale Report</h1>
+  <p class="muted">Generated: ${new Date().toLocaleString()}</p>
+  <div class="card">
+    <h2>Executive Summary</h2>
+    <pre>${JSON.stringify(data.executive_summary || data.summary || data, null, 2)}</pre>
+  </div>
+  <div class="card">
+    <h2>Details</h2>
+    <pre>${JSON.stringify(data, null, 2)}</pre>
+  </div>
+</body></html>`;
+      download(`signal-scale-report-${Date.now()}.html`, html, "text/html");
+    });
+
+    // Tabs (visual only in this simple version)
+    document.querySelectorAll(".tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("tab-active"));
+        btn.classList.add("tab-active");
+      });
+    });
+  </script>
+</body>
+</html>
