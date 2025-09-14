@@ -1,47 +1,53 @@
-from ..services.openai_client import get_completion
-from ..services.scraper import scrape_site
+# api/app/agents/cultural_radar.py
 import json
+from datetime import datetime
+from ..services.openai_client import get_completion
 
-async def run_cultural_radar(brand: dict, competitors: list) -> dict:
-    competitor_data = []
-    for comp in competitors[:3]:
-        scraped = await scrape_site(str(comp["url"]))
-        competitor_data.append({"name": comp["name"], "data": scraped})
-    
-    prompt = f"""
-    Create a Cultural Radar analysis for {brand["name"]} in {brand.get("category", "market")}.
-    
-    Competitor context: {json.dumps(competitor_data, indent=2)}
-    
-    Return JSON with this structure:
-    {{
-        "executive_summary": {{
-            "top_cultural_trends": [
-                {{"trend": "Authenticity Movement", "growth": "+45%", "lifecycle": "Scaling"}}
-            ],
-            "key_opportunities": ["List of 2-3 opportunities"],
-            "competitive_gaps": ["List of gaps vs competitors"]
-        }},
-        "consumer_signals": [
-            {{
-                "signal": "Authenticity Demand",
-                "volume": 1800,
-                "change": "+28.6%",
-                "platforms": ["TikTok", "Instagram"],
-                "opportunity": "Launch transparency campaign"
-            }}
-        ],
-        "recommendations": [
-            {{
-                "action": "Launch authenticity content series",
-                "priority": "High",
-                "effort": "Medium",
-                "roi_potential": "High",
-                "timeline": "0-30 days"
-            }}
-        ],
-        "confidence": "78%"
-    }}
+SYSTEM = {
+    "role": "system",
+    "content": (
+        "You are Cultural Radar. Return STRICT JSON only. Keys: "
+        "report_meta, executive_summary, momentum_scorecard, consumer_signals, "
+        "competitive_overlay, prospects, action_grid, historical, confidence_footer. "
+        "Use arrows (↑↔↓), ASCII heat bars, quantified volumes & WoW deltas. "
+        "No markdown; JSON object only."
+    ),
+}
+
+async def run_cultural_radar(payload: dict) -> dict:
     """
-    
-    return await get_completion(prompt)
+    Accepts a payload with keys: brand, competitors, window.
+    Calls OpenAI and returns a parsed JSON dict. If the LLM returns invalid JSON,
+    we wrap the raw string so the API still responds.
+    """
+    user = {"role": "user", "content": json.dumps(payload)}
+    res = await get_completion([SYSTEM, user])
+
+    # Extract the assistant content
+    try:
+        content = res["choices"][0]["message"]["content"]
+    except Exception:
+        # Defensive fallback
+        return {
+            "error": "OpenAI response missing content",
+            "raw": res,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    # Try to parse JSON
+    try:
+        data = json.loads(content)
+        # Ensure a minimal meta block
+        data.setdefault("report_meta", {})
+        data["report_meta"].update({
+            "agent": "cultural_radar",
+            "generated_at": datetime.utcnow().isoformat(),
+        })
+        return data
+    except Exception:
+        # Return raw if the model sent non-JSON (keeps UI from crashing)
+        return {
+            "error": "LLM did not return valid JSON",
+            "raw": content,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
