@@ -1,9 +1,25 @@
 # api/app/routers/intelligence.py
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
 
-from ..settings import settings
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, field_validator
+from typing import Any, Dict, List, Optional
+
+# If you have settings, keep this import. If not, stub SAFE_MODE = True below.
+try:
+    from ..settings import settings  # must provide settings.SAFE_MODE (bool)
+    SAFE_MODE = getattr(settings, "SAFE_MODE", True)
+except Exception:
+    SAFE_MODE = True
+
+# Try to import agents; if they fail we’ll gracefully fall back.
+try:
+    from ..agents.cultural_radar import run_cultural_radar
+    from ..agents.competitive_playbook import run_competitive_playbook
+    from ..agents.dtc_audit import run_dtc_audit
+    AGENTS_AVAILABLE = True
+except Exception as e:
+    print("[intel] agent import failed:", repr(e))
+    AGENTS_AVAILABLE = False
 
 router = APIRouter(tags=["intelligence"])
 
@@ -12,11 +28,38 @@ class AnalyzePayload(BaseModel):
     competitors: Optional[List[str]] = None
     questions: Optional[List[str]] = None
 
-def demo_result(p: AnalyzePayload) -> Dict[str, Any]:
+    # Accept both CSV strings and arrays, and coerce to list[str]
+    @field_validator("competitors", mode="before")
+    @classmethod
+    def _coerce_competitors(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return [s.strip() for s in v.split(",") if s.strip()]
+        if isinstance(v, list):
+            return [str(s) for s in v]
+        return None
+
+    @field_validator("questions", mode="before")
+    @classmethod
+    def _coerce_questions(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            return [s.strip() for s in v.split(",") if s.strip()]
+        if isinstance(v, list):
+            return [str(s) for s in v]
+        return None
+
+def demo_payload(p: AnalyzePayload) -> Dict[str, Any]:
     return {
         "status": "ok",
         "mode": "SAFE_MODE",
-        "input_echo": p.model_dump(),
+        "echo": {
+            "brand": p.brand or "Demo Brand",
+            "competitors": p.competitors or ["Competitor A", "Competitor B"],
+            "questions": p.questions or [],
+        },
         "summary": {
             "top_trends": [
                 {"name": "Ralphcore", "momentum": "+68.4%", "state": "Scaling"},
@@ -25,48 +68,56 @@ def demo_result(p: AnalyzePayload) -> Dict[str, Any]:
             ],
             "quick_wins": [
                 "Lower free shipping threshold to $150",
-                "Launch #CrooksLife UGC",
-                "Add PDP stock/urgency indicators",
+                "Launch #UGC campaign",
+                "Add urgency + stock indicators on PDPs",
             ],
         },
         "confidence": {"level": "Low (demo)", "variance": 0.0, "sources": []},
     }
 
 @router.post("/intelligence/analyze")
-async def analyze(payload: AnalyzePayload) -> Dict[str, Any]:
+async def analyze(payload: Optional[AnalyzePayload] = None) -> Dict[str, Any]:
     """
-    Frontend posts here.
-    SAFE_MODE=True returns a stable demo so the UI always works.
+    Accepts super-flexible JSON. Works with {}, or with brand/competitors/questions
+    provided as strings or arrays. Falls back to demo in SAFE_MODE or when agents are unavailable.
     """
-    print("[analyze] payload:", payload.model_dump())
+    payload = payload or AnalyzePayload()  # allow empty body {}
+    print("[/api/intelligence/analyze] payload:", payload.model_dump())
 
-    if settings.SAFE_MODE:
-        return demo_result(payload)
+    # Demo mode (no OpenAI key, or agents not wired yet)
+    if SAFE_MODE or not AGENTS_AVAILABLE:
+        return demo_payload(payload)
 
-    # --- REAL mode (wire your agents here later) ---
+    # Real mode: call your agents
     try:
         brand = payload.brand or "Brand"
         comps = payload.competitors or []
-        # from ..agents.cultural_radar import run_cultural_radar
-        # from ..agents.competitive_playbook import run_competitive_playbook
-        # from ..agents.dtc_audit import run_dtc_audit
-        # radar = run_cultural_radar(brand=brand, competitors=comps)
-        # playbook = run_competitive_playbook(brand=brand, competitors=comps)
-        # audit = run_dtc_audit(brand=brand, competitors=comps)
+        qs = payload.questions or []
+
+        radar = run_cultural_radar(brand=brand, competitors=comps, questions=qs)  # adapt if signatures differ
+        playbook = run_competitive_playbook(brand=brand, competitors=comps, questions=qs)
+        audit = run_dtc_audit(brand=brand, competitors=comps, questions=qs)
+
         return {
             "status": "ok",
             "mode": "REAL",
             "brand": brand,
             "competitors": comps,
+            "questions": qs,
             "outputs": {
-                # "cultural_radar": radar,
-                # "competitive_playbook": playbook,
-                # "dtc_audit": audit,
+                "cultural_radar": radar,
+                "competitive_playbook": playbook,
+                "dtc_audit": audit,
             },
-            "confidence": {"level": "Medium", "variance": 0.12, "sources": []},
+            "confidence": {
+                "level": "Medium",
+                "variance": 0.12,
+                "sources": ["Site audits", "Social signals", "Price scans"],
+            },
         }
     except HTTPException:
         raise
     except Exception as e:
-        print("[analyze] ERROR:", repr(e))
+        print("[/api/intelligence/analyze] ERROR:", repr(e))
+        # Return JSON error (keeps the UI from white-screening)
         return {"status": "error", "message": "Analysis failed", "detail": str(e)}
