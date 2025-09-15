@@ -1,153 +1,150 @@
-# app.py
-from fastapi import FastAPI, HTTPException, Body, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+import csv
 import io
 import os
+from typing import Any, Dict, List, Optional
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, Field
 
-# -----------------------
-# Settings (simple version)
-# -----------------------
-ENV = os.getenv("ENV", "development")
-SAFE_MODE = os.getenv("SAFE_MODE", "true").lower() in ("1", "true", "yes")
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "https://signal-scale-frontend.onrender.com")
+# ----------------------------
+# Models (tolerant to extras)
+# ----------------------------
+class Brand(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
 
-# Jinja2 environment for /templates
-TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
-jinja_env = Environment(
-    loader=FileSystemLoader(TEMPLATE_DIR),
-    autoescape=select_autoescape(["html", "xml"])
-)
+    class Config:
+        extra = "ignore"
 
-app = FastAPI(title="Signal & Scale API", version="1.0.0")
+class Competitor(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "ignore"
+
+class AnalyzeRequest(BaseModel):
+    brand: Brand = Field(default_factory=Brand)
+    competitors: List[Competitor] = Field(default_factory=list)
+
+    class Config:
+        extra = "ignore"
+
+# ----------------------------
+# App
+# ----------------------------
+app = FastAPI(title="Signal & Scale Intelligence API", version="1.0.0")
 
 # CORS
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
+origins = [o.strip() for o in allowed_origins.split(",")] if allowed_origins else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN, "http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -----------------------
-# Health + Docs
-# -----------------------
-@app.get("/healthz")
-def health():
+# ----------------------------
+# Helpers
+# ----------------------------
+def compute_simple_signals(req: AnalyzeRequest) -> List[Dict[str, Any]]:
+    """
+    Placeholder 'analysis' that always succeeds.
+    Replace with your real logic (scrapers, LLM calls, etc.).
+    """
+    rows: List[Dict[str, Any]] = []
+    bname = (req.brand.name or "").strip() or "Unknown Brand"
+
+    if not req.competitors:
+        rows.append({
+            "brand": bname,
+            "competitor": "",
+            "signal": "No competitors submitted",
+            "score": 0,
+            "note": "Submit at least one competitor to analyze."
+        })
+        return rows
+
+    for c in req.competitors:
+        cname = (c.name or "").strip() or "Unnamed Competitor"
+        rows.append({
+            "brand": bname,
+            "competitor": cname,
+            "signal": "Stub: baseline comparison",
+            "score": 50,
+            "note": f"URL seen: {c.url or 'n/a'}"
+        })
+    return rows
+
+# Return structured JSON + echo for debugging
+def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
+    signals = compute_simple_signals(req)
     return {
-        "name": "Signal & Scale",
-        "version": "1.0.0",
-        "status": "operational",
-        "environment": ENV,
-        "timestamp": datetime.utcnow().isoformat(),
-        "docs_url": "/docs"
+        "ok": True,
+        "brand": req.brand.dict(),
+        "competitors_count": len(req.competitors),
+        "signals": signals
     }
 
-# -----------------------
-# Analyze (SAFE demo)
-# -----------------------
-class AnalyzePayload(BaseModel):
-    brand: Optional[str] = None
-    competitors: Optional[List[str]] = None
-    questions: Optional[List[str]] = None
+# ----------------------------
+# Error Handler
+# ----------------------------
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    try:
+        body = await request.json()
+    except Exception:
+        body = "<non-JSON or unreadable>"
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body_received": body},
+    )
 
-def demo_payload(p: AnalyzePayload) -> Dict[str, Any]:
+# ----------------------------
+# Routes
+# ----------------------------
+@app.get("/api/health")
+def health():
+    return {"ok": True, "service": "signal-scale", "version": "1.0.0"}
+
+@app.get("/api/intelligence/schema")
+def schema():
     return {
-        "status": "ok",
-        "mode": "SAFE_MODE",
-        "brand": p.brand or "Demo Brand",
-        "competitors": p.competitors or ["Competitor A", "Competitor B"],
-        "summary": {
-            "top_trends": [
-                {"name": "Ralphcore", "momentum": "+68.4%", "state": "Scaling"},
-                {"name": "Wide Leg Trousers", "momentum": "+46.7%", "state": "Scaling"},
-                {"name": "Sustainable Streetwear", "momentum": "+27.6%", "state": "Emerging"},
-            ],
-            "quick_wins": [
-                "Lower free shipping threshold to $150",
-                "Launch #UGC campaign",
-                "Add urgency + stock indicators on PDPs",
-            ],
-        },
-        "confidence": {"level": "Low (demo)", "variance": 0.0, "sources": []},
+        "expected": {
+            "brand": {"name": "string", "url": "string", "meta": "object (optional)"},
+            "competitors": "array of {name, url, meta}"
+        }
     }
 
 @app.post("/api/intelligence/analyze")
-def analyze(payload: AnalyzePayload):
-    print("[/api/intelligence/analyze] payload:", payload.model_dump())
-    # REAL agents can be wired later. For now, ensure the endpoint always works:
-    if SAFE_MODE:
-        return demo_payload(payload)
+def analyze(req: AnalyzeRequest):
+    return analyze_core(req)
 
-    # If you later wire real agents, wrap them in try/except and return JSON.
-    return demo_payload(payload)
-
-# -----------------------
-# Export endpoint
-# -----------------------
-@app.post("/api/export/report")
-def export_report(
-    data: Dict[str, Any] = Body(...),
-    format: str = "md"  # "md" | "html" | "pdf"
-):
+@app.post("/api/intelligence/export")
+def export_csv(req: AnalyzeRequest):
     """
-    Expects JSON body like:
-    {
-      "brand": "...",
-      "competitors": [...],
-      "summary": {...},  # whatever your frontend shows
-      "confidence": {...}
+    Returns a CSV built from the same request body.
+    """
+    result = analyze_core(req)
+    rows = result.get("signals", [])  # list of dicts
+
+    output = io.StringIO()
+    fieldnames = ["brand", "competitor", "signal", "score", "note"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({k: r.get(k, "") for k in fieldnames})
+
+    csv_bytes = io.BytesIO(output.getvalue().encode("utf-8"))
+    headers = {
+        "Content-Disposition": 'attachment; filename="signal_scale_export.csv"'
     }
-    And query ?format=md|html|pdf  (or include "format" in body if you prefer)
-    """
-    # Allow body to override the query default
-    fmt = (data.get("format") or format or "md").lower()
-    brand_slug = (data.get("brand") or "report").replace(" ", "_")
-
-    # Render Markdown
-    if fmt == "md":
-        tpl = jinja_env.get_template("report.md.j2")
-        md = tpl.render(**data)
-        return Response(
-            content=md,
-            media_type="text/markdown",
-            headers={"Content-Disposition": f'attachment; filename="{brand_slug}_signal_scale.md"'}
-        )
-
-    # Render HTML (download)
-    if fmt == "html":
-        tpl = jinja_env.get_template("report.html")
-        html = tpl.render(**data)
-        return Response(
-            content=html,
-            media_type="text/html",
-            headers={"Content-Disposition": f'attachment; filename="{brand_slug}_signal_scale.html"'}
-        )
-
-    # Optional PDF (pure-Python fallback using xhtml2pdf)
-    if fmt == "pdf":
-        try:
-            from xhtml2pdf import pisa  # pure Python; no system deps
-        except Exception:
-            raise HTTPException(status_code=500, detail="PDF export not available on this server.")
-
-        tpl = jinja_env.get_template("report.html")
-        html = tpl.render(**data)
-        pdf_io = io.BytesIO()
-        result = pisa.CreatePDF(io.StringIO(html), dest=pdf_io)
-        if result.err:
-            raise HTTPException(status_code=500, detail="PDF generation failed.")
-        pdf_io.seek(0)
-        return StreamingResponse(
-            pdf_io,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{brand_slug}_signal_scale.pdf"'}
-        )
-
-    raise HTTPException(status_code=400, detail="Unsupported format. Use md|html|pdf.")
+    return StreamingResponse(csv_bytes, media_type="text/csv", headers=headers)
