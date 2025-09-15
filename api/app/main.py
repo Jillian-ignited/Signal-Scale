@@ -1,37 +1,31 @@
 # api/app/main.py
+
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import intelligence  # <-- our only router for now
-import os
 
-app = FastAPI(title="Signal & Scale API", version="1.0.0")
+# Import your router
+from .routers import intelligence
 
-# --- CORS (allow your frontend domain + localhost for dev) ---
-FRONTEND_ORIGINS = [
-    "https://signal-scale-frontend.onrender.com",
-    "https://signal-scale.onrender.com",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# Create FastAPI instance
+app = FastAPI(
+    title="Signal & Scale API",
+    version="1.0.0",
+)
+
+# Allow cross-origin requests (frontend ↔ backend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,
+    allow_origins=["*"],  # TODO: restrict to your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Mount routers under a single /api prefix ---
-# IMPORTANT: the router itself must NOT also include "/api" in its prefix.
-app.include_router(intelligence.router, prefix="/api")
+# Register routers
+app.include_router(intelligence.router)
 
 @app.get("/healthz")
 def health():
-    return {
-        "status": "ok",
-        "service": "signal-scale",
-        "env": os.getenv("ENV", "development")
-    }
+    return {"status": "ok", "cwd": os.getcwd()}
 
-# For Render's gunicorn import path `api.app.main:app`
-# no if __name__ == "__main__" block needed.
