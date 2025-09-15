@@ -8,6 +8,6 @@ services:
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.13.0
       - key: ALLOWED_ORIGINS
-        sync: false   # set in dashboard, e.g. https://your-frontend-domain.com
+        sync: false
