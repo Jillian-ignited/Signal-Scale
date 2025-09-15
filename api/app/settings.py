@@ -1,12 +1,13 @@
 # api/app/settings.py
-import os
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List, Optional
 
-class Settings(BaseModel):
-    ENV: str = os.getenv("ENV", "production")
-    OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./local.db")
-    APP_NAME: str = "Signal & Scale"
-    TZ: str = "America/Chicago"
+class Settings(BaseSettings):
+    ENV: str = "development"
+    OPENAI_API_KEY: Optional[str] = None
+    CORS_ORIGINS: List[str] = ["*"]  # or set to your exact frontend origin(s)
+    SAFE_MODE: bool = True  # <-- default True so your UI works now
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
