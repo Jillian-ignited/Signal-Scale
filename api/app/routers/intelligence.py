@@ -1,15 +1,36 @@
 # api/app/routers/intelligence.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import List, Optional
 
-router = APIRouter(prefix="/intelligence", tags=["intelligence"])  # <- NO leading /api here
+router = APIRouter(
+    prefix="/intelligence",   # <-- NOTE: NO leading /api here
+    tags=["intelligence"]
+)
 
+# ----- Models -----
 class AnalyzePayload(BaseModel):
-    brand: str | None = None
-    competitors: list[str] | None = None
-    questions: list[str] | None = None
+    brand: Optional[str] = None
+    competitors: Optional[List[str]] = None
+    questions: Optional[List[str]] = None
 
+# ----- Routes -----
 @router.post("/analyze")
 async def analyze(payload: AnalyzePayload):
-    # ... your logic ...
-    return {"ok": True, "echo": payload.model_dump()}
+    """
+    Simple placeholder that proves routing works.
+    Your real analysis code can be injected here later.
+    """
+    # Minimal validation demo
+    if not (payload.brand or payload.questions):
+        raise HTTPException(status_code=400, detail="Provide 'brand' or 'questions'.")
+
+    # Return something deterministic for now
+    return {
+        "ok": True,
+        "received": payload.model_dump(),
+        "meta": {
+            "route": "/api/intelligence/analyze",
+            "note": "Router prefix '/intelligence' + app.include_router(prefix='/api')"
+        }
+    }
