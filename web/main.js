@@ -22,7 +22,7 @@ function buildPayload() {
   return { brand: { name: brandName || null, url: brandUrl || null, meta: null }, competitors };
 }
 
-/** Robust POST: read text first to avoid "Unexpected end of JSON input". */
+/** Robust POST: read text first to avoid JSON parse errors. */
 async function postApi(path, payload, expectBlob = false) {
   const res = await fetch(path, {
     method: 'POST',
