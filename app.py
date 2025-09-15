@@ -18,6 +18,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ----------------- Serve frontend (./web) from SAME service -----------------
+import sys
+from fastapi.responses import HTMLResponse
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+WEB_DIR = os.path.join(BASE_DIR, "web")
+INDEX_HTML = os.path.join(WEB_DIR, "index.html")
+
+# Startup diagnostics (shows in Render logs)
+print(f"[startup] WEB_DIR={WEB_DIR} exists={os.path.isdir(WEB_DIR)}", file=sys.stdout, flush=True)
+print(f"[startup] INDEX_HTML exists={os.path.exists(INDEX_HTML)}", file=sys.stdout, flush=True)
+
+if os.path.isdir(WEB_DIR):
+    # Serve everything under / (so /, /main.js, etc.)
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+else:
+    @app.get("/", response_class=HTMLResponse)
+    def missing_frontend():
+        return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected folder: <code>{WEB_DIR}</code></p>", status_code=500)
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True, "frontend_found": os.path.exists(INDEX_HTML)}
 
 # ----------------- Lightweight auth (sell access now) -----------------
 def _load_keys(env_name: str) -> List[str]:
