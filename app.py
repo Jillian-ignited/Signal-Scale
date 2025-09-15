@@ -1,132 +1,34 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
 from datetime import datetime
 
-# Create Flask app
 app = Flask(__name__)
+CORS(app)
 
-# Enable CORS
-CORS(app, origins=["*"], methods=["GET", "POST", "OPTIONS"], 
-     allow_headers=["Content-Type", "Authorization"])
+@app.route('/')
+def health():
+    return {'status': 'healthy', 'service': 'Signal & Scale Backend'}
 
-@app.route('/', methods=['GET'])
-def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'service': 'Signal & Scale Backend',
-        'timestamp': datetime.now().isoformat()
-    })
-
-@app.route('/api/intelligence/analyze', methods=['POST', 'OPTIONS'])
-def analyze_brand():
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'})
+@app.route('/api/intelligence/analyze', methods=['POST'])
+def analyze():
+    data = request.get_json()
+    brand = data['brand']
+    competitors = data.get('competitors', [])
     
-    try:
-        data = request.get_json()
-        print(f"Received request: {data}")
-        
-        if not data or 'brand' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Brand information is required'
-            }), 422
-        
-        brand = data['brand']
-        competitors = data.get('competitors', [])
-        
-        # Industry-specific intelligent scoring
-        industry_scores = {
-            'Technology': { 'trend': 9.2, 'brand': 88, 'sentiment': 82, 'dtc': 85 },
-            'Fashion & Apparel': { 'trend': 8.1, 'brand': 79, 'sentiment': 74, 'dtc': 77 },
-            'Streetwear': { 'trend': 8.7, 'brand': 85, 'sentiment': 78, 'dtc': 82 },
-            'Automotive': { 'trend': 8.4, 'brand': 81, 'sentiment': 76, 'dtc': 79 },
-            'Beauty & Cosmetics': { 'trend': 8.3, 'brand': 83, 'sentiment': 80, 'dtc': 84 },
-            'Athletic Wear': { 'trend': 8.6, 'brand': 84, 'sentiment': 77, 'dtc': 81 },
-            'Luxury Fashion': { 'trend': 7.9, 'brand': 86, 'sentiment': 75, 'dtc': 83 }
+    return jsonify({
+        'success': True,
+        'data': {
+            'brand_name': brand['name'],
+            'industry': brand.get('industry', 'Technology'),
+            'kpis': {
+                'trend_momentum': 8.7,
+                'brand_score': 85,
+                'competitors_tracked': len(competitors),
+                'sentiment_score': 78,
+                'dtc_score': 82
+            },
+            'cultural_radar': f"Cultural analysis for {brand['name']} shows strong market presence in {brand.get('industry', 'Technology')}...",
+            'competitive_playbook': f"Competitive analysis for {brand['name']} indicates leader position...",
+            'dtc_audit': f"DTC audit for {brand['name']} shows 82/100 performance score..."
         }
-
-        scores = industry_scores.get(brand.get('industry', 'Technology'), 
-                                   { 'trend': 8.0, 'brand': 80, 'sentiment': 75, 'dtc': 78 })
-        
-        result = {
-            'success': True,
-            'data': {
-                'brand_name': brand['name'],
-                'industry': brand.get('industry', 'Technology'),
-                'analysis_timestamp': datetime.now().isoformat(),
-                'kpis': {
-                    'trend_momentum': scores['trend'],
-                    'brand_score': scores['brand'],
-                    'competitors_tracked': len(competitors),
-                    'sentiment_score': scores['sentiment'],
-                    'dtc_score': scores['dtc']
-                },
-                'cultural_radar': f"""Cultural Radar Analysis for {brand['name']}
-
-Industry: {brand.get('industry', 'Technology')}
-Trend Momentum: {scores['trend']}/10
-Market Position: Strong presence in {brand.get('industry', 'Technology')} sector
-
-Key Cultural Insights:
-• Brand demonstrates {scores['trend']}/10 momentum in current market trends
-• {brand['name']} shows strong cultural relevance in {brand.get('industry', 'Technology')}
-• Competitive landscape includes {len(competitors)} major players being monitored
-• Market sentiment score: {scores['sentiment']}/100 indicating positive reception
-
-Social Media Presence:
-• High engagement rates across digital platforms
-• Strong brand recognition in target demographics
-• Content alignment with trending topics and cultural moments""",
-
-                'competitive_playbook': f"""Competitive Playbook for {brand['name']}
-
-Market Position: Leader in {brand.get('industry', 'Technology')}
-Brand Score: {scores['brand']}/100
-Competitive Analysis Date: {datetime.now().strftime('%Y-%m-%d')}
-
-Competitive Advantages Identified:
-• Strong brand recognition and established market presence
-• Innovation leadership position in {brand.get('industry', 'Technology')} sector
-• Premium positioning with quality-focused value proposition
-• Established customer loyalty base and retention rates
-
-Strategic Recommendations:
-• Monitor competitor pricing strategies and market positioning
-• Invest in digital marketing capabilities and social media presence
-• Focus on unique value proposition differentiation and messaging""",
-
-                'dtc_audit': f"""DTC Audit Report for {brand['name']}
-
-Website: {brand.get('website', 'N/A')}
-Overall Audit Score: {scores['dtc']}/100
-Industry: {brand.get('industry', 'Technology')}
-Audit Completion Date: {datetime.now().strftime('%Y-%m-%d')}
-
-Website Performance Analysis:
-• Site Loading Speed: Optimized for performance across devices
-• Mobile Responsiveness: Fully responsive design implementation
-• User Experience: Intuitive navigation structure and user flow
-
-Priority Recommendations:
-• Enhance personalization features and dynamic content delivery
-• Optimize conversion funnel performance and reduce abandonment
-• Implement advanced analytics tracking and customer behavior analysis"""
-            }
-        }
-        
-        print(f"Sending successful response for {brand['name']}")
-        return jsonify(result)
-        
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f'Analysis failed: {str(e)}'
-        }), 500
-
-# This is crucial - the app object must be available at module level
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    })
