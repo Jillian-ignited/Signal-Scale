@@ -2,19 +2,11 @@ services:
   - type: web
     name: signal-scale
     env: python
-    region: oregon
-    plan: starter
-    workingDirectory: ./api
-    buildCommand: |
-      pip install --upgrade pip
-      pip install --no-cache-dir -r requirements.txt
-    startCommand: |
-      gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
+    rootDir: api                 # 👈 tell Render to cd into /api before building
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
     envVars:
-      - key: ENV
-        value: production
       - key: OPENAI_API_KEY
         sync: false
-      - key: FRONTEND_URL
-        value: https://signal-scale-frontend.onrender.com
-    healthCheckPath: /healthz
+      - key: SAFE_MODE
+        value: "true"
