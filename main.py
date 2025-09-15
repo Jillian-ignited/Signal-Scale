@@ -7,6 +7,7 @@ import json
 # Import your services
 from services.real_competitive_intelligence import RealCompetitiveIntelligence
 
+
 app = Flask(__name__)
 
 # Enable CORS for all routes
