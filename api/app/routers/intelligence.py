@@ -1,14 +1,10 @@
 # api/app/routers/intelligence.py
-
-from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
+from typing import List, Optional, Any, Dict
 
 from ..settings import settings
 
-# Try to import real agents; if it fails we stay in SAFE_MODE demo
-AGENTS_AVAILABLE = False
 try:
     from ..agents.cultural_radar import run_cultural_radar
     from ..agents.competitive_playbook import run_competitive_playbook
@@ -18,24 +14,14 @@ except Exception as e:
     print("[intel] agent import failed:", repr(e))
     AGENTS_AVAILABLE = False
 
-# ✅ define router BEFORE using it in decorators
 router = APIRouter(prefix="/api", tags=["intelligence"])
-
-
-@router.get("/ping")
-async def ping() -> Dict[str, str]:
-    """Simple ping to verify router is mounted."""
-    return {"status": "ok", "router": "intelligence"}
-
 
 class AnalyzePayload(BaseModel):
     brand: Optional[str] = None
     competitors: Optional[List[str]] = None
     questions: Optional[List[str]] = None
 
-
 def demo_payload(p: AnalyzePayload) -> Dict[str, Any]:
-    """Zero-dependency demo response so the UI renders even without agents/keys."""
     return {
         "status": "ok",
         "mode": "SAFE_MODE",
@@ -56,15 +42,25 @@ def demo_payload(p: AnalyzePayload) -> Dict[str, Any]:
         "confidence": {"level": "Low (demo)", "variance": 0.0, "sources": []},
     }
 
+def coerce_payload(raw: Dict[str, Any]) -> AnalyzePayload:
+    """Coerce any dict into AnalyzePayload without throwing 422."""
+    if raw is None:
+        raw = {}
+    return AnalyzePayload(
+        brand=raw.get("brand"),
+        competitors=raw.get("competitors"),
+        questions=raw.get("questions"),
+    )
 
 @router.post("/intelligence/analyze")
-async def analyze(payload: AnalyzePayload) -> Dict[str, Any]:
+async def analyze(raw: Dict[str, Any] = Body(default={})):
     """
-    Primary analysis endpoint.
-    SAFE_MODE=true or missing agents → demo JSON.
-    Otherwise calls your real agent functions.
+    Accepts any JSON (even {}), coerces to AnalyzePayload, and runs analysis.
+    This avoids 422 errors if the frontend sends an empty or slightly different shape.
     """
-    print("[/api/intelligence/analyze] payload:", payload.model_dump())
+    print("[/api/intelligence/analyze] raw:", raw)
+    payload = coerce_payload(raw)
+    print("[/api/intelligence/analyze] coerced:", payload.model_dump())
 
     if settings.SAFE_MODE or not AGENTS_AVAILABLE:
         return demo_payload(payload)
@@ -72,7 +68,6 @@ async def analyze(payload: AnalyzePayload) -> Dict[str, Any]:
     try:
         brand = payload.brand or "Brand"
         comps = payload.competitors or []
-
         radar = run_cultural_radar(brand=brand, competitors=comps)
         playbook = run_competitive_playbook(brand=brand, competitors=comps)
         audit = run_dtc_audit(brand=brand, competitors=comps)
@@ -98,3 +93,8 @@ async def analyze(payload: AnalyzePayload) -> Dict[str, Any]:
     except Exception as e:
         print("[/api/intelligence/analyze] ERROR:", repr(e))
         return {"status": "error", "message": "Analysis failed", "detail": str(e)}
+
+# sanity check
+@router.get("/intelligence/ping")
+async def ping():
+    return {"ok": True}
