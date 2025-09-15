@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: signal-scale
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: API_KEYS
+        sync: false      # e.g., sk_live_demo,sk_live_customerA
+      - key: MANUS_API_KEY
+        sync: false
+      - key: MANUS_BASE_URL
+        sync: false      # e.g., https://api.manus.im (or your beta host)
+      - key: MANUS_AGENT_ID
+        sync: false
+      - key: MANUS_RUN_PATH
+        value: /v1/agents/run
+      - key: ALLOWED_ORIGINS
+        value: "*"
