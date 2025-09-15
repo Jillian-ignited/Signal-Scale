@@ -1,27 +1,73 @@
-# api/app/main.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from .routers import intelligence
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import os
+from datetime import datetime
+import json
 
-app = FastAPI(title="Signal & Scale API", version="1.0.0")
+# Import your services
+from services.real_competitive_intelligence import RealCompetitiveIntelligence
 
-# --- CORS: allow your frontend + local dev ---
-ALLOWED_ORIGINS = [
-    "https://signal-scale-frontend.onrender.com",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
 
-@app.get("/healthz")
-def healthz():
-    return {"status": "ok"}
+# Enable CORS for all routes
+CORS(app, origins=["*"], methods=["GET", "POST", "OPTIONS"], 
+     allow_headers=["Content-Type", "Authorization"])
 
-# Mount your API routes under /api  (final path: /api/intelligence/analyze)
-app.include_router(intelligence.router, prefix="/api")
+# Initialize the competitive intelligence service
+intelligence_service = RealCompetitiveIntelligence()
+
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'service': 'Signal & Scale Backend',
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/intelligence/analyze', methods=['POST', 'OPTIONS'])
+def analyze_brand():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+    
+    try:
+        # Get the request data
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        print(f"Received analysis request: {json.dumps(data, indent=2)}")
+        
+        # Validate required fields
+        if 'brand' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Brand information is required'
+            }), 422
+        
+        brand = data['brand']
+        if 'name' not in brand:
+            return jsonify({
+                'success': False,
+                'error': 'Brand name is required'
+            }), 422
+        
+        # Generate competitive intelligence
+        result = intelligence_service.generate_competitive_analysis(data)
+        
+        print(f"Analysis completed successfully for {brand['name']}")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Analysis error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Analysis failed: {str(e)}'
+        }), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
