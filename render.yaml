@@ -1,12 +1,17 @@
 services:
   - type: web
     name: signal-scale
-    env: python
-    rootDir: api                 # 👈 tell Render to cd into /api before building
+    runtime: python3
     buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
+    startCommand: gunicorn api.app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
     envVars:
+      - key: ENV
+        value: production
+      - key: SAFE_MODE
+        value: "true"   # flip to false when your agents are ready
+      - key: ALLOWED_ORIGINS
+        value: "https://signal-scale-frontend.onrender.com,http://localhost:5173"
       - key: OPENAI_API_KEY
         sync: false
-      - key: SAFE_MODE
-        value: "true"
+    healthCheckPath: /healthz
+
