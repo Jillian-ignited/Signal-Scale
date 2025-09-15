@@ -1,12 +1,1 @@
-fastapi
-uvicorn[standard]
-gunicorn
-httpx
-pydantic
-jinja2
-SQLAlchemy
-psycopg[binary]
-selectolax
-python-multipart
-
 
