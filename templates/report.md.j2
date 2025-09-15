@@ -1,0 +1,13 @@
+# {{ brand or "Brand" }} — Signal & Scale Report
+
+**Generated:** {{ (now or "") if now else "" }}
+
+## Summary
+{{ summary | tojson(indent=2) if summary else "No summary provided." }}
+
+## Competitors
+{% if competitors %}{% for c in competitors %}- {{ c }}
+{% endfor %}{% else %}- None{% endif %}
+
+## Confidence
+{{ confidence | tojson(indent=2) if confidence else "N/A" }}
