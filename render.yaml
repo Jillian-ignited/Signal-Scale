@@ -1,16 +1,13 @@
 services:
   - type: web
     name: signal-scale
-    runtime: python3
-    buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: gunicorn app:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:$PORT
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
     envVars:
-      - key: ENV
-        value: production
-      - key: SAFE_MODE
-        value: "true"          # set "false" when real agents are wired
-      - key: FRONTEND_ORIGIN
-        value: https://signal-scale-frontend.onrender.com
-      - key: OPENAI_API_KEY
-        sync: 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
-    healthCheckPath: /healthz
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ALLOWED_ORIGINS
+        sync: false   # set in dashboard, e.g. https://your-frontend-domain.com
