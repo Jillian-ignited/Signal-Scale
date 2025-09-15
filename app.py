@@ -12,28 +12,27 @@ def health():
 
 @app.route('/api/intelligence/analyze', methods=['POST'])
 def analyze():
-    data = request.get_json()
-    brand = data['brand']
-    competitors = data.get('competitors', [])
-    
-    return jsonify({
-        'success': True,
-        'data': {
-            'brand_name': brand['name'],
-            'industry': brand.get('industry', 'Technology'),
-            'kpis': {
-                'trend_momentum': 8.7,
-                'brand_score': 85,
-                'competitors_tracked': len(competitors),
-                'sentiment_score': 78,
-                'dtc_score': 82
-            },
-            'cultural_radar': f"Cultural analysis for {brand['name']} shows strong market presence in {brand.get('industry', 'Technology')}...",
-            'competitive_playbook': f"Competitive analysis for {brand['name']} indicates leader position...",
-            'dtc_audit': f"DTC audit for {brand['name']} shows 82/100 performance score..."
-        }
-    })
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    try:
+        data = request.get_json()
+        brand = data['brand']
+        competitors = data.get('competitors', [])
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'brand_name': brand['name'],
+                'industry': brand.get('industry', 'Technology'),
+                'kpis': {
+                    'trend_momentum': 8.7,
+                    'brand_score': 85,
+                    'competitors_tracked': len(competitors),
+                    'sentiment_score': 78,
+                    'dtc_score': 82
+                },
+                'cultural_radar': f"Cultural analysis for {brand['name']} shows strong market presence in {brand.get('industry', 'Technology')}...",
+                'competitive_playbook': f"Competitive analysis for {brand['name']} indicates leader position...",
+                'dtc_audit': f"DTC audit for {brand['name']} shows 82/100 performance score..."
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
