@@ -2,7 +2,6 @@
 API routes for CI Orchestrator - Simplified version without Pydantic
 """
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json
@@ -23,10 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for the React frontend - only if directory exists
+# Frontend path - no assets mounting needed since we use CDN
 frontend_build_path = Path(__file__).parent.parent.parent / "frontend" / "dist"
-if frontend_build_path.exists() and (frontend_build_path / "assets").exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_build_path / "assets")), name="assets")
 
 @app.get("/health")
 async def health_check():
@@ -137,29 +134,6 @@ async def get_demo_data():
         "brand": {"name": "Crooks & Castles"},
         "competitors": [{"name": "Stüssy"}, {"name": "Hellstar"}, {"name": "Reason Clothing"}, {"name": "Supreme"}]
     })
-
-@app.get("/api/modes")
-async def get_modes():
-    """Get available analysis modes and their descriptions."""
-    return {
-        "modes": ["weekly_report", "cultural_radar", "peer_tracker", "all"],
-        "descriptions": {
-            "weekly_report": "Track brand mentions, sentiment, engagement highlights, and competitive analysis",
-            "cultural_radar": "Identify emerging creators and influencers in your target market", 
-            "peer_tracker": "Audit your DTC site against competitors across key dimensions",
-            "all": "Combined analysis across all modes"
-        }
-    }
-
-@app.post("/analyze")
-async def analyze_legacy(request_data: dict):
-    """Legacy analyze endpoint for backward compatibility."""
-    return await analyze_brand(request_data)
-
-@app.get("/modes")
-async def get_modes_legacy():
-    """Legacy modes endpoint for backward compatibility."""
-    return await get_modes()
 
 @app.get("/")
 @app.head("/")
