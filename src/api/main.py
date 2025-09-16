@@ -3,7 +3,7 @@ API routes for CI Orchestrator - Simplified version without Pydantic
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json
 from pathlib import Path
@@ -23,9 +23,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for the React frontend
+# Mount static files for the React frontend - only if directory exists
 frontend_build_path = Path(__file__).parent.parent.parent / "frontend" / "dist"
-if frontend_build_path.exists():
+if frontend_build_path.exists() and (frontend_build_path / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(frontend_build_path / "assets")), name="assets")
 
 @app.get("/health")
@@ -98,78 +98,34 @@ async def analyze_brand(request_data: dict):
                         "influence_score": 92,
                         "recommendation": "seed",
                         "content_focus": "streetwear styling, brand reviews"
-                    },
-                    {
-                        "handle": "@urban_fits",
-                        "platform": "Instagram", 
-                        "followers": 67000,
-                        "engagement_rate": 9.4,
-                        "influence_score": 88,
-                        "recommendation": "collab",
-                        "content_focus": "outfit coordination, street photography"
-                    },
-                    {
-                        "handle": "@hypebeast_daily",
-                        "platform": "YouTube",
-                        "followers": 95000,
-                        "engagement_rate": 7.6,
-                        "influence_score": 85,
-                        "recommendation": "seed",
-                        "content_focus": "brand analysis, trend forecasting"
                     }
                 ],
-                "top_3_to_activate": [
-                    "@streetwear_maven",
-                    "@urban_fits", 
-                    "@hypebeast_daily"
-                ]
+                "top_3_to_activate": ["@streetwear_maven", "@urban_fits", "@hypebeast_daily"]
             },
             "peer_tracker": {
                 "scorecard": {
-                    "dimensions": ["Homepage", "PDP", "Checkout", "Content", "Community", "Mobile UX", "Price Presentation"],
+                    "dimensions": ["Homepage", "PDP", "Checkout"],
                     "brands": [brand_name, "Stüssy", "Hellstar", "Reason Clothing", "Supreme"],
                     "scores": [
-                        {"brand": brand_name, "scores": [7, 6, 5, 0, 0, 0, 0]},
-                        {"brand": "Stüssy", "scores": [9, 8, 8, 0, 0, 0, 0]},
-                        {"brand": "Hellstar", "scores": [6, 7, 6, 0, 0, 0, 0]},
-                        {"brand": "Reason Clothing", "scores": [5, 5, 4, 0, 0, 0, 0]},
-                        {"brand": "Supreme", "scores": [8, 9, 7, 0, 0, 0, 0]}
+                        {"brand": brand_name, "scores": [7, 6, 5]},
+                        {"brand": "Stüssy", "scores": [9, 8, 8]},
+                        {"brand": "Hellstar", "scores": [6, 7, 6]},
+                        {"brand": "Reason Clothing", "scores": [5, 5, 4]},
+                        {"brand": "Supreme", "scores": [8, 9, 7]}
                     ]
                 },
-                "strengths": [
-                    "Strong brand heritage and authentic street culture positioning",
-                    "Quality product photography and visual presentation"
-                ],
-                "gaps": [
-                    "Checkout flow optimization needed - currently 3x longer than Stüssy",
-                    "Mobile experience needs improvement for better conversion"
-                ],
+                "strengths": ["Strong brand heritage", "Quality product photography"],
+                "gaps": ["Checkout flow optimization needed", "Mobile experience needs improvement"],
                 "priority_fixes": [
                     {
                         "action": "Implement one-click checkout with Apple Pay, Google Pay, and Shop Pay",
                         "impact": "high",
                         "description": "Could reduce cart abandonment by 25-30% based on industry benchmarks"
-                    },
-                    {
-                        "action": "Add comprehensive size guides and fit recommendations to PDPs",
-                        "impact": "high", 
-                        "description": "Sizing concerns mentioned in 23% of negative customer feedback"
-                    },
-                    {
-                        "action": "Optimize mobile checkout flow - currently 3x longer than Stüssy",
-                        "impact": "medium",
-                        "description": "Mobile accounts for 67% of traffic but only 34% of conversions"
                     }
                 ]
             },
             "warnings": ["Demo mode - using mock data for demonstration"],
-            "provenance": {
-                "sources": [
-                    "Social media monitoring (demo)",
-                    "Website analysis (demo)", 
-                    "Creator database (demo)"
-                ]
-            }
+            "provenance": {"sources": ["Social media monitoring (demo)", "Website analysis (demo)", "Creator database (demo)"]}
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -179,12 +135,7 @@ async def get_demo_data():
     """Get demo data for frontend development and testing."""
     return await analyze_brand({
         "brand": {"name": "Crooks & Castles"},
-        "competitors": [
-            {"name": "Stüssy"},
-            {"name": "Hellstar"}, 
-            {"name": "Reason Clothing"},
-            {"name": "Supreme"}
-        ]
+        "competitors": [{"name": "Stüssy"}, {"name": "Hellstar"}, {"name": "Reason Clothing"}, {"name": "Supreme"}]
     })
 
 @app.get("/api/modes")
@@ -200,7 +151,6 @@ async def get_modes():
         }
     }
 
-# Legacy endpoints for backward compatibility
 @app.post("/analyze")
 async def analyze_legacy(request_data: dict):
     """Legacy analyze endpoint for backward compatibility."""
@@ -212,6 +162,7 @@ async def get_modes_legacy():
     return await get_modes()
 
 @app.get("/")
+@app.head("/")
 async def root():
     """Root endpoint - serve React app or API info."""
     index_file = frontend_build_path / "index.html"
@@ -221,13 +172,12 @@ async def root():
         return {
             "message": "Signal & Scale - Brand Intelligence API",
             "version": "1.0.0",
-            "frontend": "React app not built - run 'npm run build' in frontend directory"
+            "frontend": "React app not built - add index.html to frontend/dist/ directory"
         }
 
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
     """Serve the React frontend for all non-API routes."""
-    # For all routes, serve the React app
     index_file = frontend_build_path / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
@@ -235,7 +185,7 @@ async def serve_react_app(full_path: str):
         return {
             "message": "Signal & Scale API", 
             "error": "Frontend not built",
-            "instructions": "Run 'cd frontend && npm run build' to build the React app"
+            "instructions": "Add index.html to frontend/dist/ directory"
         }
 
 if __name__ == "__main__":
