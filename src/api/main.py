@@ -1,24 +1,12 @@
 """
-API routes for CI Orchestrator with React frontend integration
+API routes for CI Orchestrator - Simplified version without Pydantic
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import sys
+import json
 from pathlib import Path
-import structlog
-
-# Add the parent directory to the path so we can import from src
-current_dir = Path(__file__).parent
-project_root = current_dir.parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.models import CIOrchestratorInput, CIOrchestratorOutput, Brand, Competitor
-from src.orchestrator import CIOrchestrator
-
-logger = structlog.get_logger()
 
 app = FastAPI(
     title="Signal & Scale - Brand Intelligence API",
@@ -35,11 +23,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize orchestrator
-orchestrator = CIOrchestrator()
-
 # Mount static files for the React frontend
-frontend_build_path = project_root / "frontend" / "dist"
+frontend_build_path = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if frontend_build_path.exists():
     app.mount("/assets", StaticFiles(directory=str(frontend_build_path / "assets")), name="assets")
 
@@ -48,84 +33,159 @@ async def health_check():
     """Health check endpoint for monitoring."""
     return {"status": "healthy", "service": "signal-scale-api"}
 
-@app.post("/api/analyze", response_model=CIOrchestratorOutput)
-async def analyze_brand(input_data: CIOrchestratorInput):
+@app.post("/api/analyze")
+async def analyze_brand(request_data: dict):
     """
     Run competitive intelligence analysis for a brand.
-    
-    This endpoint accepts brand information, competitors, and analysis parameters,
-    then returns comprehensive insights across weekly reports, cultural radar,
-    and peer tracking.
+    Returns demo data for now - can be connected to real analysis later.
     """
     try:
-        logger.info(f"Received analysis request for brand: {input_data.brand.name}")
-        result = await orchestrator.run_analysis(input_data)
-        return result
+        # Extract brand name from request if provided
+        brand_name = "Crooks & Castles"
+        if isinstance(request_data, dict) and "brand" in request_data:
+            if isinstance(request_data["brand"], dict) and "name" in request_data["brand"]:
+                brand_name = request_data["brand"]["name"]
+        
+        # Return comprehensive demo data
+        return {
+            "weekly_report": {
+                "brand_mentions_overview": {
+                    "this_window": 847,
+                    "prev_window": 623,
+                    "delta_pct": 35.9
+                },
+                "customer_sentiment": {
+                    "positive": f"Strong positive sentiment around new {brand_name} Heritage Collection drop, with customers praising authentic street culture representation and quality improvements",
+                    "negative": "Some pricing concerns on premium pieces, with comparisons to Stüssy and Supreme pricing strategies",
+                    "neutral": "General discussions about sizing and fit, with neutral commentary on shipping and customer service"
+                },
+                "engagement_highlights": [
+                    {
+                        "platform": "TikTok",
+                        "content": "Heritage Collection unboxing video",
+                        "engagement": 45000,
+                        "sentiment": "positive"
+                    }
+                ],
+                "streetwear_trends": [
+                    {
+                        "trend": "Heritage Revival",
+                        "description": "Increased mentions of vintage-inspired pieces and throwback designs",
+                        "hashtags": ["#heritage", "#vintage", "#throwback", "#authentic"]
+                    },
+                    {
+                        "trend": "Utility Aesthetics", 
+                        "description": "Growing interest in functional streetwear with cargo pants and technical fabrics",
+                        "hashtags": ["#utility", "#cargo", "#techwear", "#functional"]
+                    }
+                ],
+                "competitive_mentions": [],
+                "opportunities_risks": [
+                    {
+                        "type": "opportunity",
+                        "description": "Heritage trend alignment with brand DNA",
+                        "priority": "high"
+                    }
+                ]
+            },
+            "cultural_radar": {
+                "creators": [
+                    {
+                        "handle": "@streetwear_maven",
+                        "platform": "TikTok",
+                        "followers": 89000,
+                        "engagement_rate": 8.7,
+                        "influence_score": 92,
+                        "recommendation": "seed",
+                        "content_focus": "streetwear styling, brand reviews"
+                    },
+                    {
+                        "handle": "@urban_fits",
+                        "platform": "Instagram", 
+                        "followers": 67000,
+                        "engagement_rate": 9.4,
+                        "influence_score": 88,
+                        "recommendation": "collab",
+                        "content_focus": "outfit coordination, street photography"
+                    },
+                    {
+                        "handle": "@hypebeast_daily",
+                        "platform": "YouTube",
+                        "followers": 95000,
+                        "engagement_rate": 7.6,
+                        "influence_score": 85,
+                        "recommendation": "seed",
+                        "content_focus": "brand analysis, trend forecasting"
+                    }
+                ],
+                "top_3_to_activate": [
+                    "@streetwear_maven",
+                    "@urban_fits", 
+                    "@hypebeast_daily"
+                ]
+            },
+            "peer_tracker": {
+                "scorecard": {
+                    "dimensions": ["Homepage", "PDP", "Checkout", "Content", "Community", "Mobile UX", "Price Presentation"],
+                    "brands": [brand_name, "Stüssy", "Hellstar", "Reason Clothing", "Supreme"],
+                    "scores": [
+                        {"brand": brand_name, "scores": [7, 6, 5, 0, 0, 0, 0]},
+                        {"brand": "Stüssy", "scores": [9, 8, 8, 0, 0, 0, 0]},
+                        {"brand": "Hellstar", "scores": [6, 7, 6, 0, 0, 0, 0]},
+                        {"brand": "Reason Clothing", "scores": [5, 5, 4, 0, 0, 0, 0]},
+                        {"brand": "Supreme", "scores": [8, 9, 7, 0, 0, 0, 0]}
+                    ]
+                },
+                "strengths": [
+                    "Strong brand heritage and authentic street culture positioning",
+                    "Quality product photography and visual presentation"
+                ],
+                "gaps": [
+                    "Checkout flow optimization needed - currently 3x longer than Stüssy",
+                    "Mobile experience needs improvement for better conversion"
+                ],
+                "priority_fixes": [
+                    {
+                        "action": "Implement one-click checkout with Apple Pay, Google Pay, and Shop Pay",
+                        "impact": "high",
+                        "description": "Could reduce cart abandonment by 25-30% based on industry benchmarks"
+                    },
+                    {
+                        "action": "Add comprehensive size guides and fit recommendations to PDPs",
+                        "impact": "high", 
+                        "description": "Sizing concerns mentioned in 23% of negative customer feedback"
+                    },
+                    {
+                        "action": "Optimize mobile checkout flow - currently 3x longer than Stüssy",
+                        "impact": "medium",
+                        "description": "Mobile accounts for 67% of traffic but only 34% of conversions"
+                    }
+                ]
+            },
+            "warnings": ["Demo mode - using mock data for demonstration"],
+            "provenance": {
+                "sources": [
+                    "Social media monitoring (demo)",
+                    "Website analysis (demo)", 
+                    "Creator database (demo)"
+                ]
+            }
+        }
     except Exception as e:
-        logger.error(f"Error in analysis endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/demo-data")
 async def get_demo_data():
     """Get demo data for frontend development and testing."""
-    
-    demo_input = CIOrchestratorInput(
-        brand=Brand(
-            name="Crooks & Castles",
-            url="https://crooksncastles.com",
-            meta={
-                "aliases": ["C&C", "Crooks"],
-                "hashtags": ["#crooksncastles", "#crooks", "#streetwear"]
-            }
-        ),
-        competitors=[
-            Competitor(name="Stüssy", url="https://stussy.com"),
-            Competitor(name="Hellstar", url="https://hellstar.com"),
-            Competitor(name="Reason Clothing", url="https://reasonclothing.com"),
-            Competitor(name="Supreme", url="https://supremenewyork.com"),
-            Competitor(name="BAPE", url="https://bape.com")
-        ],
-        mode="all",
-        window_days=7,
-        max_results_per_section=5
-    )
-    
-    try:
-        result = await orchestrator.run_analysis(demo_input)
-        return result
-    except Exception as e:
-        logger.warning(f"Demo data analysis failed, returning mock data: {str(e)}")
-        # Return mock data if analysis fails
-        return {
-            "weekly_report": {
-                "brand_mentions_overview": {"this_window": 847, "prev_window": 623, "delta_pct": 35.9},
-                "customer_sentiment": {
-                    "positive": "Strong positive sentiment around new Heritage Collection",
-                    "negative": "Some pricing concerns on premium pieces",
-                    "neutral": "General discussions about sizing and fit"
-                },
-                "engagement_highlights": [],
-                "streetwear_trends": [],
-                "competitive_mentions": [],
-                "opportunities_risks": []
-            },
-            "cultural_radar": {
-                "creators": [],
-                "top_3_to_activate": []
-            },
-            "peer_tracker": {
-                "scorecard": {
-                    "dimensions": ["Homepage", "PDP", "Checkout"],
-                    "brands": ["Crooks & Castles", "Stüssy", "Supreme"],
-                    "scores": []
-                },
-                "strengths": [],
-                "gaps": [],
-                "priority_fixes": []
-            },
-            "warnings": ["Demo mode - using mock data"],
-            "provenance": {"sources": []}
-        }
+    return await analyze_brand({
+        "brand": {"name": "Crooks & Castles"},
+        "competitors": [
+            {"name": "Stüssy"},
+            {"name": "Hellstar"}, 
+            {"name": "Reason Clothing"},
+            {"name": "Supreme"}
+        ]
+    })
 
 @app.get("/api/modes")
 async def get_modes():
@@ -134,17 +194,17 @@ async def get_modes():
         "modes": ["weekly_report", "cultural_radar", "peer_tracker", "all"],
         "descriptions": {
             "weekly_report": "Track brand mentions, sentiment, engagement highlights, and competitive analysis",
-            "cultural_radar": "Identify emerging creators and influencers in your target market",
+            "cultural_radar": "Identify emerging creators and influencers in your target market", 
             "peer_tracker": "Audit your DTC site against competitors across key dimensions",
             "all": "Combined analysis across all modes"
         }
     }
 
 # Legacy endpoints for backward compatibility
-@app.post("/analyze", response_model=CIOrchestratorOutput)
-async def analyze_legacy(input_data: CIOrchestratorInput):
+@app.post("/analyze")
+async def analyze_legacy(request_data: dict):
     """Legacy analyze endpoint for backward compatibility."""
-    return await analyze_brand(input_data)
+    return await analyze_brand(request_data)
 
 @app.get("/modes")
 async def get_modes_legacy():
@@ -164,22 +224,14 @@ async def root():
             "frontend": "React app not built - run 'npm run build' in frontend directory"
         }
 
-# Serve React app for all other routes
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
     """Serve the React frontend for all non-API routes."""
-    # Check if it's a static file request
-    if full_path.startswith("assets/"):
-        file_path = frontend_build_path / full_path
-        if file_path.exists():
-            return FileResponse(file_path)
-    
-    # For all other routes, serve the React app
+    # For all routes, serve the React app
     index_file = frontend_build_path / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
     else:
-        # Fallback if frontend not built
         return {
             "message": "Signal & Scale API", 
             "error": "Frontend not built",
@@ -189,4 +241,3 @@ async def serve_react_app(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
