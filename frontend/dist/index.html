@@ -1,14 +1,465 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Signal & Scale - Brand Intelligence Platform</title>
-    <script type="module" crossorigin src="/assets/index-D1fpqwA2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Cd8iQIlN.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-button.active { background-color: #fef3c7; color: #92400e; }
+        .progress-bar { transition: width 0.3s ease; }
+        @keyframes spin { to { transform: rotate(360deg ); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body class="bg-stone-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-stone-200 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center">
+                    <i data-lucide="target" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-semibold text-stone-900">Signal & Scale</h1>
+                    <p class="text-sm text-stone-600">Brand Intelligence Platform</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    <i data-lucide="crown" class="w-3 h-3 mr-1"></i>
+                    Professional Plan
+                </span>
+                <button id="runAnalysis" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md">
+                    <i data-lucide="play" class="w-4 h-4 mr-2"></i>
+                    <span id="analysisText">Run Analysis</span>
+                </button>
+                <button class="inline-flex items-center px-4 py-2 border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-medium rounded-md">
+                    <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                    Export Report
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Analysis Progress -->
+    <div id="progressBar" class="bg-blue-50 border-b border-blue-200 px-6 py-3 hidden">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-blue-900">Running competitive intelligence analysis...</span>
+            <span id="progressText" class="text-sm text-blue-700">0%</span>
+        </div>
+        <div class="w-full bg-blue-200 rounded-full h-2">
+            <div id="progressFill" class="bg-blue-600 h-2 rounded-full progress-bar" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="px-6 py-6">
+        <!-- Brand Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-3xl font-bold text-stone-900">Crooks & Castles</h2>
+                    <p class="text-stone-600">Competitive Intelligence Dashboard</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-stone-500">Last updated</p>
+                    <p class="text-sm font-medium text-stone-900">2 hours ago</p>
+                </div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg border border-stone-200 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-stone-600">Brand Mentions</p>
+                            <p class="text-2xl font-bold text-stone-900">847</p>
+                        </div>
+                        <div class="flex items-center text-green-600">
+                            <i data-lucide="trending-up" class="w-4 h-4 mr-1"></i>
+                            <span class="text-sm font-medium">35.9%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg border border-stone-200 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-stone-600">Active Creators</p>
+                            <p class="text-2xl font-bold text-stone-900">4</p>
+                        </div>
+                        <i data-lucide="users" class="w-8 h-8 text-stone-400"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg border border-stone-200 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-stone-600">Avg Influence Score</p>
+                            <p class="text-2xl font-bold text-stone-900">87</p>
+                        </div>
+                        <i data-lucide="star" class="w-8 h-8 text-amber-400"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg border border-stone-200 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-stone-600">Competitive Score</p>
+                            <p class="text-2xl font-bold text-stone-900">7.2/10</p>
+                        </div>
+                        <i data-lucide="target" class="w-8 h-8 text-stone-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="space-y-6">
+            <div class="grid w-full grid-cols-4 bg-stone-100 rounded-lg p-1">
+                <button class="tab-button active px-4 py-2 text-sm font-medium rounded-md" data-tab="overview">Overview</button>
+                <button class="tab-button px-4 py-2 text-sm font-medium rounded-md" data-tab="cultural-radar">Cultural Radar</button>
+                <button class="tab-button px-4 py-2 text-sm font-medium rounded-md" data-tab="peer-tracker">Peer Tracker</button>
+                <button class="tab-button px-4 py-2 text-sm font-medium rounded-md" data-tab="insights">Insights</button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active space-y-6">
+                <!-- Customer Sentiment -->
+                <div class="bg-white rounded-lg border border-stone-200">
+                    <div class="px-6 py-4 border-b border-stone-200">
+                        <h3 class="text-lg font-semibold text-stone-900 flex items-center">
+                            <div class="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                            Customer Sentiment
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                                <h4 class="font-semibold text-green-800 mb-2">Positive</h4>
+                                <p class="text-sm text-green-700">Strong positive sentiment around new Heritage Collection drop, with customers praising authentic street culture representation and quality improvements</p>
+                            </div>
+                            <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                                <h4 class="font-semibold text-red-800 mb-2">Negative</h4>
+                                <p class="text-sm text-red-700">Some pricing concerns on premium pieces, with comparisons to Stüssy and Supreme pricing strategies</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <h4 class="font-semibold text-gray-800 mb-2">Neutral</h4>
+                                <p class="text-sm text-gray-700">General discussions about sizing and fit, with neutral commentary on shipping and customer service</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Streetwear Trends -->
+                <div class="bg-white rounded-lg border border-stone-200">
+                    <div class="px-6 py-4 border-b border-stone-200">
+                        <h3 class="text-lg font-semibold text-stone-900 flex items-center">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                            Streetwear Trends
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-6">
+                            <div class="border-l-4 border-blue-200 pl-4">
+                                <h4 class="font-semibold text-stone-900 mb-2">Heritage Revival</h4>
+                                <p class="text-sm text-stone-600 mb-3">Increased mentions of vintage-inspired pieces and throwback designs across platforms</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#heritage</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#vintage</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#throwback</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#authentic</span>
+                                </div>
+                            </div>
+                            <div class="border-l-4 border-blue-200 pl-4">
+                                <h4 class="font-semibold text-stone-900 mb-2">Utility Aesthetics</h4>
+                                <p class="text-sm text-stone-600 mb-3">Growing interest in functional streetwear with cargo pants and technical fabrics trending</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#utility</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#cargo</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#techwear</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#functional</span>
+                                </div>
+                            </div>
+                            <div class="border-l-4 border-blue-200 pl-4">
+                                <h4 class="font-semibold text-stone-900 mb-2">Collaborative Culture</h4>
+                                <p class="text-sm text-stone-600 mb-3">Rising demand for brand collaborations and limited edition drops</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#collab</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#limitededition</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#exclusive</span>
+                                    <span class="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">#drop</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cultural Radar Tab -->
+            <div id="cultural-radar" class="tab-content space-y-6">
+                <div class="bg-white rounded-lg border border-stone-200">
+                    <div class="px-6 py-4 border-b border-stone-200">
+                        <h3 class="text-lg font-semibold text-stone-900">Top Creators to Activate</h3>
+                        <p class="text-sm text-stone-600">High-influence creators under 100K followers with strong engagement rates</p>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="border border-stone-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <h4 class="font-semibold text-stone-900">@streetwear_maven</h4>
+                                        <p class="text-sm text-stone-500">TikTok</p>
+                                    </div>
+                                    <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">seed</span>
+                                </div>
+                                <div class="space-y-2 mb-4">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Followers</span>
+                                        <span class="font-medium">89.0K</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Engagement Rate</span>
+                                        <span class="font-medium">8.7%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Influence Score</span>
+                                        <span class="font-medium">92/100</span>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-stone-500 mb-3">streetwear styling, brand reviews</p>
+                                <button class="w-full px-3 py-1 border border-stone-300 text-stone-700 text-sm rounded hover:bg-stone-50">View Profile</button>
+                            </div>
+
+                            <div class="border border-stone-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <h4 class="font-semibold text-stone-900">@urban_fits</h4>
+                                        <p class="text-sm text-stone-500">Instagram</p>
+                                    </div>
+                                    <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">collab</span>
+                                </div>
+                                <div class="space-y-2 mb-4">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Followers</span>
+                                        <span class="font-medium">67.0K</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Engagement Rate</span>
+                                        <span class="font-medium">9.4%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Influence Score</span>
+                                        <span class="font-medium">88/100</span>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-stone-500 mb-3">outfit coordination, street photography</p>
+                                <button class="w-full px-3 py-1 border border-stone-300 text-stone-700 text-sm rounded hover:bg-stone-50">View Profile</button>
+                            </div>
+
+                            <div class="border border-stone-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <h4 class="font-semibold text-stone-900">@hypebeast_daily</h4>
+                                        <p class="text-sm text-stone-500">YouTube</p>
+                                    </div>
+                                    <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">seed</span>
+                                </div>
+                                <div class="space-y-2 mb-4">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Followers</span>
+                                        <span class="font-medium">95.0K</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Engagement Rate</span>
+                                        <span class="font-medium">7.6%</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-stone-600">Influence Score</span>
+                                        <span class="font-medium">85/100</span>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-stone-500 mb-3">brand analysis, trend forecasting</p>
+                                <button class="w-full px-3 py-1 border border-stone-300 text-stone-700 text-sm rounded hover:bg-stone-50">View Profile</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peer Tracker Tab -->
+            <div id="peer-tracker" class="tab-content space-y-6">
+                <div class="bg-white rounded-lg border border-stone-200">
+                    <div class="px-6 py-4 border-b border-stone-200">
+                        <h3 class="text-lg font-semibold text-stone-900">Competitive Scorecard</h3>
+                        <p class="text-sm text-stone-600">DTC website performance across key dimensions (1-10 scale)</p>
+                    </div>
+                    <div class="p-6">
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-stone-200">
+                                        <th class="text-left py-3 px-4 font-medium text-stone-600">Dimension</th>
+                                        <th class="text-center py-3 px-4 font-medium text-stone-600">Crooks & Castles</th>
+                                        <th class="text-center py-3 px-4 font-medium text-stone-600">Stüssy</th>
+                                        <th class="text-center py-3 px-4 font-medium text-stone-600">Hellstar</th>
+                                        <th class="text-center py-3 px-4 font-medium text-stone-600">Reason Clothing</th>
+                                        <th class="text-center py-3 px-4 font-medium text-stone-600">Supreme</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-stone-100">
+                                        <td class="py-3 px-4 font-medium text-stone-900">Homepage</td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">7</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">9</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">6</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">5</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">8</span></td>
+                                    </tr>
+                                    <tr class="border-b border-stone-100">
+                                        <td class="py-3 px-4 font-medium text-stone-900">PDP</td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">6</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">8</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">7</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">5</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">9</span></td>
+                                    </tr>
+                                    <tr class="border-b border-stone-100">
+                                        <td class="py-3 px-4 font-medium text-stone-900">Checkout</td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">5</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">8</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">6</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">4</span></td>
+                                        <td class="text-center py-3 px-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">7</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority Action Items -->
+                <div class="bg-white rounded-lg border border-stone-200">
+                    <div class="px-6 py-4 border-b border-stone-200">
+                        <h3 class="text-lg font-semibold text-stone-900">Priority Action Items</h3>
+                        <p class="text-sm text-stone-600">Ranked recommendations based on competitive analysis</p>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            <div class="border border-stone-200 rounded-lg p-4">
+                                <div class="flex items-start justify-between mb-2">
+                                    <h4 class="font-medium text-stone-900 flex-1">Implement one-click checkout with Apple Pay, Google Pay, and Shop Pay</h4>
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">high impact</span>
+                                </div>
+                                <p class="text-sm text-stone-600">Could reduce cart abandonment by 25-30% based on industry benchmarks</p>
+                            </div>
+                            <div class="border border-stone-200 rounded-lg p-4">
+                                <div class="flex items-start justify-between mb-2">
+                                    <h4 class="font-medium text-stone-900 flex-1">Add comprehensive size guides and fit recommendations to PDPs</h4>
+                                    <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">high impact</span>
+                                </div>
+                                <p class="text-sm text-stone-600">Sizing concerns mentioned in 23% of negative customer feedback</p>
+                            </div>
+                            <div class="border border-stone-200 rounded-lg p-4">
+                                <div class="flex items-start justify-between mb-2">
+                                    <h4 class="font-medium text-stone-900 flex-1">Optimize mobile checkout flow - currently 3x longer than Stüssy</h4>
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">medium impact</span>
+                                </div>
+                                <p class="text-sm text-stone-600">Mobile accounts for 67% of traffic but only 34% of conversions</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights Tab -->
+            <div id="insights" class="tab-content space-y-6">
+                <div class="bg-white rounded-lg border border-stone-200">
+                    <div class="px-6 py-4 border-b border-stone-200">
+                        <h3 class="text-lg font-semibold text-stone-900">Opportunities & Risks</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                                <h4 class="font-semibold text-green-800 mb-4">Opportunities</h4>
+                                <ul class="space-y-2 text-sm text-green-700">
+                                    <li>• Heritage trend alignment with brand DNA</li>
+                                    <li>• Strong creator engagement in streetwear community</li>
+                                    <li>• Growing utility aesthetic trend matches product line</li>
+                                    <li>• Positive sentiment around quality improvements</li>
+                                </ul>
+                            </div>
+                            <div class="bg-red-50 p-6 rounded-lg border border-red-200">
+                                <h4 class="font-semibold text-red-800 mb-4">Risks</h4>
+                                <ul class="space-y-2 text-sm text-red-700">
+                                    <li>• Pricing pressure from competitors</li>
+                                    <li>• Mobile checkout conversion lag</li>
+                                    <li>• Limited creator activation compared to peers</li>
+                                    <li>• Sizing concerns affecting customer satisfaction</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Tab functionality
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.getAttribute('data-tab');
+                
+                // Remove active class from all tabs and buttons
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding content
+                button.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Analysis functionality
+        document.getElementById('runAnalysis').addEventListener('click', function() {
+            const button = this;
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const analysisText = document.getElementById('analysisText');
+            
+            // Disable button and show progress
+            button.disabled = true;
+            progressBar.classList.remove('hidden');
+            analysisText.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block"></div>Analyzing...';
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 100) progress = 100;
+                
+                progressFill.style.width = progress + '%';
+                progressText.textContent = Math.round(progress) + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        progressBar.classList.add('hidden');
+                        button.disabled = false;
+                        analysisText.innerHTML = '<i data-lucide="play" class="w-4 h-4 mr-2"></i>Run Analysis';
+                        lucide.createIcons();
+                    }, 1000);
+                }
+            }, 500);
+        });
+    </script>
+</body>
 </html>
