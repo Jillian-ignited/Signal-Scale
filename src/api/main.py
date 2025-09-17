@@ -1,4 +1,4 @@
-# main.py — Signal & Scale API (v2.7.0)
+# main.py — Signal & Scale API (v2.8.0)
 # Dependencies: fastapi, uvicorn[standard], httpx, pydantic
 
 import os, io, csv, json, sys
@@ -13,7 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # -------------------- App --------------------
-app = FastAPI(title="Signal & Scale", version="2.7.0")
+API_PREFIX = os.getenv("API_PREFIX", "/api").rstrip("/")  # default '/api'
+app = FastAPI(title="Signal & Scale", version="2.8.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
@@ -25,7 +26,7 @@ async def log_requests(request: Request, call_next):
     print(f"{request.method} {request.url.path} -> {resp.status_code}", flush=True)
     return resp
 
-# -------------------- Auth (your customers’ app keys) --------------------
+# -------------------- Auth (customer app keys) --------------------
 def _load_keys(env_name: str) -> List[str]:
     raw = os.getenv(env_name, "").strip()
     if not raw:
@@ -44,23 +45,20 @@ class Brand(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
-    class Config:
-        extra = "ignore"
+    class Config: extra = "ignore"
 
 class Competitor(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
-    class Config:
-        extra = "ignore"
+    class Config: extra = "ignore"
 
 class AnalyzeRequest(BaseModel):
     brand: Brand = Field(default_factory=Brand)
     competitors: List[Competitor] = Field(default_factory=list)
-    mode: Optional[str] = "all"      # weekly_report | cultural_radar | peer_tracker | all
+    mode: Optional[str] = "all"   # weekly_report | cultural_radar | peer_tracker | all
     window_days: Optional[int] = 7
-    class Config:
-        extra = "ignore"
+    class Config: extra = "ignore"
 
 # Better 422 visibility
 @app.exception_handler(RequestValidationError)
@@ -100,13 +98,10 @@ def _slug(s: Optional[str]) -> str:
 
 def infer_category(brand: Brand, comps: List[Competitor]) -> str:
     names = {_slug(brand.name)} | {_slug(c.name) for c in comps}
-    if names & ATHLETIC_KEYWORDS:
-        return "athletic"
-    if names & STREETWEAR_KEYWORDS:
-        return "streetwear"
+    if names & ATHLETIC_KEYWORDS: return "athletic"
+    if names & STREETWEAR_KEYWORDS: return "streetwear"
     url = _slug(brand.url)
-    if any(k in url for k in ["run","sport","athlet"]):
-        return "athletic"
+    if any(k in url for k in ["run","sport","athlet"]): return "athletic"
     return "apparel_lifestyle"
 
 def audience_archetypes(category: str) -> List[str]:
@@ -141,9 +136,8 @@ def competitor_focus_points(category: str) -> List[str]:
         return ["drop cadence/story","PDP media richness","collab/editorial hubs","community/UGC"]
     return ["value clarity/entry price","PDP trust (reviews/size)","checkout speed (express pays)"]
 
-# -------------------- Normalization & synthesis --------------------
+# -------------------- Manus/OpenAI plumbing --------------------
 def normalize_from_manus(brand: Brand, comps: List[Competitor], raw: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Expect Manus to return structured JSON sections (weekly_report, cultural_radar, peer_tracker)."""
     sections = {
         "weekly_report": raw.get("weekly_report") or {},
         "cultural_radar": raw.get("cultural_radar") or {},
@@ -172,7 +166,7 @@ def normalize_from_manus(brand: Brand, comps: List[Competitor], raw: Dict[str, A
             "note": "source: manus | section: weekly_report"
         })
 
-    # Cultural radar: top creators
+    # Cultural radar: creators
     for c in (sections["cultural_radar"].get("creators") or [])[:5]:
         signals.append({
             "brand": brand.name or "Unknown",
@@ -182,7 +176,7 @@ def normalize_from_manus(brand: Brand, comps: List[Competitor], raw: Dict[str, A
             "note": f"source: manus | section: cultural_radar | profile: {c.get('profile','')}"
         })
 
-    # Peer tracker: compare focal brand vs peers by dimension
+    # Peer tracker deltas
     sc = (sections["peer_tracker"].get("scorecard") or {}).get("scores") or []
     focal = [s for s in sc if _slug(s.get("brand")) == _slug(brand.name)]
     for c in comps[:8]:
@@ -205,19 +199,14 @@ def normalize_from_manus(brand: Brand, comps: List[Competitor], raw: Dict[str, A
     return signals, sections
 
 def synthesize_brand_strategy(brand: Brand, comps: List[Competitor], sections: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Category-aware actions so Nike ≠ Crooks ≠ Boutique."""
     cat = infer_category(brand, comps)
     signals: List[Dict[str, Any]] = []
-
-    # Audience archetypes & creator plays
     for a in audience_archetypes(cat):
         signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Audience to activate: {a}", "score":55, "note": f"source: strategy | category: {cat}"})
     for cp in creator_playbook(cat):
         signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Creator play: {cp['type']} — {cp['activation']}", "score":58, "note": f"why: {cp['why']} | category: {cat} | source: strategy"})
     for f in competitor_focus_points(cat):
         signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Competitor focus area: {f}", "score":57, "note": f"category: {cat} | source: strategy"})
-
-    # Surface top Manus opportunities again as explicit actions
     for opp in (sections.get("weekly_report", {}).get("opportunities_risks") or [])[:5]:
         signals.append({
             "brand": brand.name or "Unknown",
@@ -229,8 +218,7 @@ def synthesize_brand_strategy(brand: Brand, comps: List[Competitor], sections: D
     return signals
 
 def is_thin(rows: List[Dict[str, Any]]) -> bool:
-    if not rows:
-        return True
+    if not rows: return True
     meaningful = [r for r in rows if (r.get("signal") or "").strip().lower() not in ("", "no insights")]
     return len(meaningful) < THIN_MIN_SIGNALS
 
@@ -246,7 +234,6 @@ def fallback_rows(brand: Brand, comps: List[Competitor], note: str) -> List[Dict
     out += [dict(s, note=(s.get("note","") + " | fallback")) for s in synthesize_brand_strategy(brand, comps, {"weekly_report":{}})[:6]]
     return out
 
-# -------------------- Providers --------------------
 def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     if not (MANUS_API_KEY and MANUS_BASE_URL and MANUS_AGENT_ID):
         raise RuntimeError("Manus not configured")
@@ -256,7 +243,7 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
         "competitors": [c.dict() for c in req.competitors],
         "mode": req.mode or "all",
         "window_days": req.window_days or 7,
-        "context": {"source":"signal-scale","version":"2.7.0"}
+        "context": {"source":"signal-scale","version":"2.8.0"}
     }
     headers = {"Authorization": f"Bearer {MANUS_API_KEY}", "Content-Type": "application/json"}
     url = f"{MANUS_BASE_URL}{MANUS_RUN_PATH}"
@@ -270,7 +257,6 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
     return rows, sections
 
 def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
-    """Brand-differentiated fallback via OpenAI Chat Completions."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OpenAI not configured")
     category = infer_category(req.brand, req.competitors)
@@ -317,7 +303,7 @@ def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
         })
     return out
 
-# -------------------- Core --------------------
+# -------------------- Core orchestration --------------------
 def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
     errors: List[str] = []
     rows: List[Dict[str, Any]] = []
@@ -327,12 +313,10 @@ def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
         try:
             if p == "manus":
                 rows, sections = call_manus(req)
-                if rows:
-                    break
+                if rows: break
             elif p == "openai":
                 rows = call_openai(req)
-                if rows:
-                    break
+                if rows: break
         except Exception as e:
             errors.append(f"{p}: {type(e).__name__}: {str(e)[:200]}")
             continue
@@ -342,15 +326,15 @@ def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
         rows = fallback_rows(req.brand, req.competitors, note=note)
         sections = {"weekly_report":{}, "cultural_radar":{}, "peer_tracker":{}, "warnings":[note]}
 
-    # Add small category-aware strategy set for differentiation
+    # small category-aware strategy set for differentiation
     strategy = synthesize_brand_strategy(req.brand, req.competitors, sections)[:12]
-    # Deduplicate (competitor, signal)
+
+    # dedupe by (competitor, signal)
     seen = set()
     final_rows: List[Dict[str, Any]] = []
     for r in rows + strategy:
         key = (_slug(r.get("competitor")), _slug(r.get("signal")))
-        if key in seen:
-            continue
+        if key in seen: continue
         seen.add(key)
         final_rows.append(r)
 
@@ -363,53 +347,18 @@ def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
         "sections": sections
     }
 
-# -------------------- API --------------------
-@app.get("/api/health")
-def health():
-    return {
-        "ok": True,
-        "service": "signal-scale",
-        "version": "2.7.0",
-        "keys_enabled": bool(APP_API_KEYS),
-        "manus_configured": bool(MANUS_API_KEY),
-        "openai_configured": bool(OPENAI_API_KEY),
-        "provider_order": PROVIDER_ORDER
-    }
-
-@app.get("/api/integrations/manus/check")
-def manus_check(_=Depends(require_api_key)):
-    return {
-        "configured": bool(MANUS_API_KEY),
-        "base_url_set": bool(MANUS_BASE_URL),
-        "agent_id_set": bool(MANUS_AGENT_ID),
-        "run_path": MANUS_RUN_PATH,
-        "timeout_s": MANUS_TIMEOUT_S
-    }
-
-@app.get("/api/integrations/openai/check")
-def openai_check(_=Depends(require_api_key)):
-    return {
-        "configured": bool(OPENAI_API_KEY),
-        "model": OPENAI_MODEL,
-        "chat_url": OPENAI_CHAT_URL
-    }
-
-@app.post("/api/intelligence/analyze")
-def analyze(req: AnalyzeRequest, _=Depends(require_api_key)):
+# -------------------- Handlers (single source of truth) --------------------
+def analyze_handler(req: AnalyzeRequest, _=Depends(require_api_key)):
     result = analyze_core(req)
-
-    # Original shape
     signals = result.get("signals", [])
 
-    # UI-compat alias: insights[] with title
-    insights = []
-    for r in signals:
-        insights.append({
-            "competitor": r.get("competitor", ""),
-            "title": r.get("signal", ""),
-            "score": r.get("score", 0),
-            "note": r.get("note", "")
-        })
+    # UI-friendly projections
+    insights = [{
+        "competitor": r.get("competitor", ""),
+        "title": r.get("signal", ""),
+        "score": r.get("score", 0),
+        "note": r.get("note", "")
+    } for r in signals]
 
     summary = {
         "brand": result.get("brand", {}).get("name") or "Unknown",
@@ -419,26 +368,67 @@ def analyze(req: AnalyzeRequest, _=Depends(require_api_key)):
     }
 
     payload = dict(result)
-    payload["insights"] = insights
-    payload["summary"] = summary
+    payload["insights"] = insights              # primary UI key
+    payload["summary"]  = summary
+    # extra aliases some bundles expect
+    payload["results"]  = insights
+    payload["data"]     = insights
+    payload["items"]    = insights
     return payload
 
-@app.post("/api/intelligence/export")
-def export_csv(req: AnalyzeRequest, _=Depends(require_api_key)):
+def export_handler(req: AnalyzeRequest, _=Depends(require_api_key)):
     result = analyze_core(req)
     rows = result.get("signals", [])
     buf = io.StringIO()
     fieldnames = ["brand","competitor","signal","score","note"]
     w = csv.DictWriter(buf, fieldnames=fieldnames); w.writeheader()
-    for r in rows:
-        w.writerow({k: r.get(k,"") for k in fieldnames})
+    for r in rows: w.writerow({k: r.get(k,"") for k in fieldnames})
     return StreamingResponse(
         io.BytesIO(buf.getvalue().encode("utf-8")),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename=\"signal_scale_export.csv\"'}
     )
 
-# Simple debug: echoes category + first 5 insights as plaintext
+# -------------------- Routes (with and without /api prefix) --------------------
+@app.get(f"{API_PREFIX}/health")
+def health():
+    return {
+        "ok": True,
+        "service": "signal-scale",
+        "version": "2.8.0",
+        "keys_enabled": bool(APP_API_KEYS),
+        "manus_configured": bool(MANUS_API_KEY),
+        "openai_configured": bool(OPENAI_API_KEY),
+        "provider_order": PROVIDER_ORDER
+    }
+
+@app.get("/api/health")        # keep legacy fixed path too
+def health_legacy():
+    return health()
+
+@app.get("/health")            # super-legacy
+def health_alias():
+    return health()
+
+# Analyze / Export — prefixed
+@app.post(f"{API_PREFIX}/intelligence/analyze")
+def analyze_prefixed(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return analyze_handler(req, _)
+
+@app.post(f"{API_PREFIX}/intelligence/export")
+def export_prefixed(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return export_handler(req, _)
+
+# Analyze / Export — no prefix aliases (for older frontends)
+@app.post("/intelligence/analyze")
+def analyze_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return analyze_handler(req, _)
+
+@app.post("/intelligence/export")
+def export_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return export_handler(req, _)
+
+# Simple debug: plaintext peek
 @app.get("/debug", response_class=PlainTextResponse)
 def debug(_=Depends(require_api_key)):
     demo = analyze_core(AnalyzeRequest(brand=Brand(name="Demo Brand"), competitors=[Competitor(name="Peer A"), Competitor(name="Peer B")]))
@@ -447,11 +437,9 @@ def debug(_=Depends(require_api_key)):
 
 # -------------------- Frontend (serve / + assets) --------------------
 def find_web_dir() -> str:
-    # 1) explicit override
     override = os.getenv("WEB_DIR", "").strip()
     if override and os.path.exists(os.path.join(override, "index.html")):
         return override
-    # 2) common locations
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(base_dir, "web"),                         # src/api/web
@@ -472,7 +460,6 @@ INDEX_HTML = os.path.join(WEB_DIR, "index.html")
 print(f"[startup] USING WEB_DIR={WEB_DIR} exists={os.path.isdir(WEB_DIR)}", flush=True)
 print(f"[startup] INDEX_HTML exists={os.path.exists(INDEX_HTML)}", flush=True)
 
-# Serve Vite assets (hashed files) and the full dist
 assets_dir = os.path.join(WEB_DIR, "assets")
 if os.path.isdir(assets_dir):
     app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
@@ -486,8 +473,7 @@ def root():
 
 @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def spa_fallback(full_path: str):
-    # Let real API paths 404 through
-    if full_path.startswith("api"):
+    if full_path.startswith("api") or full_path.startswith("v1") or full_path.startswith("intelligence"):
         raise HTTPException(status_code=404, detail="Not found")
     if not os.path.exists(INDEX_HTML):
         return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected: <code>{INDEX_HTML}</code></p>", status_code=500)
@@ -496,6 +482,5 @@ def spa_fallback(full_path: str):
 @app.api_route("/favicon.ico", methods=["GET", "HEAD"])
 def favicon():
     ico_path = os.path.join(WEB_DIR, "favicon.ico")
-    if os.path.exists(ico_path):
-        return FileResponse(ico_path)
+    if os.path.exists(ico_path): return FileResponse(ico_path)
     return HTMLResponse("", status_code=204)
