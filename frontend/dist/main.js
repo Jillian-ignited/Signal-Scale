@@ -1,15 +1,10 @@
-// main.js
-
 const qs = (s) => document.querySelector(s);
-
-// Elements
 const resultTbl = qs('#resultsTable');
 const resultBody = qs('#resultsBody');
 const emptyState = qs('#emptyState');
 const statusEl = qs('#status');
 const apiKeyInput = qs('#apiKey');
 
-// Persist API key
 (function initKey() {
   const saved = localStorage.getItem('ss_api_key') || '';
   apiKeyInput.value = saved;
@@ -19,14 +14,13 @@ const apiKeyInput = qs('#apiKey');
   });
 })();
 
-// Health check
 (async function health() {
   try {
     const r = await fetch('/api/health');
     const j = await r.json();
     qs('#healthPill').textContent = j.ok ? 'healthy' : 'check config';
     qs('#healthPill').style.background = j.ok ? '#253b2e' : '#3b2525';
-    qs('#footerHealth').textContent = `providers: ${j.provider_order?.join(', ') || '-'}`;
+    qs('#kvData').textContent = `data: probes:${j.probes ? 'on' : 'off'} psi:${j.pagespeed ? 'on' : 'off'} yt:${j.youtube ? 'on' : 'off'}`;
   } catch {
     qs('#healthPill').textContent = 'no api';
     qs('#healthPill').style.background = '#3b2525';
@@ -46,7 +40,7 @@ function buildPayload() {
     const [name, url] = line.split('|').map(p => (p || '').trim());
     return { name: name || null, url: url || null };
   });
-  const reportText = qs('#reportText')?.value.trim();
+  const reportText = qs('#reportText').value.trim();
   const reports = reportText ? [reportText] : [];
   return { brand: { name: brandName || null, url: brandUrl || null, meta: null }, competitors, reports, mode: 'all', window_days: 7 };
 }
@@ -74,12 +68,14 @@ async function postApi(path, payload, expectBlob=false) {
 }
 
 function renderInsights(payload) {
-  const insights = payload?.analysis?.trends || payload?.insights || payload?.results || [];
+  const insights = payload?.insights || payload?.results || payload?.data || payload?.items || [];
+  const brand = payload?.summary?.brand || payload?.brand?.name || 'Unknown';
   const cat = payload?.summary?.category || payload?.category_inferred || 'unknown';
   const count = insights.length;
 
-  qs('#category').textContent = `category: ${cat}`;
-  qs('#summary').textContent = `${payload?.brand?.name || 'Unknown'} · ${count} insights`;
+  qs('#summaryBrand').textContent = brand;
+  qs('#kvCategory').textContent = `category: ${cat}`;
+  qs('#kvCount').textContent = `insights: ${count}`;
 
   if (!count) {
     resultTbl.style.display = 'none';
@@ -89,17 +85,16 @@ function renderInsights(payload) {
 
   resultBody.innerHTML = insights.map(it => `
     <tr>
-      <td>${(it.competitor || it.name || '').toString()}</td>
-      <td>${(it.title || it.signal || '').toString()}</td>
+      <td>${(it.competitor || '').toString()}</td>
+      <td>${(it.title || '').toString()}</td>
       <td>${(it.score ?? '').toString()}</td>
-      <td>${(it.note || it.recommendation || '').toString()}</td>
+      <td>${(it.note || '').toString()}</td>
     </tr>
   `).join('');
   emptyState.style.display = 'none';
   resultTbl.style.display = 'table';
 }
 
-// Actions
 qs('#analyzeBtn').addEventListener('click', async () => {
   const payload = buildPayload();
   try {
