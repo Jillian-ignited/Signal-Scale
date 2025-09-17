@@ -1,11 +1,20 @@
-# main.py — Signal & Scale API (v2.8.0)
-# Dependencies: fastapi, uvicorn[standard], httpx, pydantic
+# main.py — Signal & Scale API (v3.0, no-Manus mode with report ingest)
+# Dependencies:
+#   fastapi, uvicorn[standard], httpx, pydantic, python-multipart, pypdf, python-docx (optional)
+# Add to requirements.txt:
+# fastapi==0.115.0
+# uvicorn[standard]==0.30.6
+# httpx==0.27.2
+# pydantic==2.8.2
+# python-multipart==0.0.9
+# pypdf==5.0.1
+# python-docx==1.1.2
 
-import os, io, csv, json, sys
+import os, io, csv, json, re
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from fastapi import FastAPI, Request, Header, HTTPException, Depends
+from fastapi import FastAPI, Request, Header, HTTPException, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError
@@ -14,7 +23,7 @@ from pydantic import BaseModel, Field
 
 # -------------------- App --------------------
 API_PREFIX = os.getenv("API_PREFIX", "/api").rstrip("/")  # default '/api'
-app = FastAPI(title="Signal & Scale", version="2.8.0")
+app = FastAPI(title="Signal & Scale", version="3.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
@@ -56,8 +65,11 @@ class Competitor(BaseModel):
 class AnalyzeRequest(BaseModel):
     brand: Brand = Field(default_factory=Brand)
     competitors: List[Competitor] = Field(default_factory=list)
-    mode: Optional[str] = "all"   # weekly_report | cultural_radar | peer_tracker | all
+    mode: Optional[str] = "all"      # weekly_report | cultural_radar | peer_tracker | all
     window_days: Optional[int] = 7
+    # NEW: direct report input
+    reports: List[str] = Field(default_factory=list)       # pasted text blobs
+    report_urls: List[str] = Field(default_factory=list)   # (future) remote fetch, not used now
     class Config: extra = "ignore"
 
 # Better 422 visibility
@@ -70,26 +82,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=422, content={"detail": exc.errors(), "body_received": body})
 
 # -------------------- Provider config --------------------
-PROVIDER_ORDER = [p.strip().lower() for p in os.getenv("PROVIDER_ORDER", "manus,openai").split(",") if p.strip()]
+PROVIDER_ORDER = [p.strip().lower() for p in os.getenv("PROVIDER_ORDER", "openai").split(",") if p.strip()]
 
-# Manus
-MANUS_API_KEY   = os.getenv("MANUS_API_KEY", "").strip()
-MANUS_BASE_URL  = os.getenv("MANUS_BASE_URL", "").rstrip("/")
-MANUS_AGENT_ID  = os.getenv("MANUS_AGENT_ID", "").strip()
-MANUS_RUN_PATH  = os.getenv("MANUS_RUN_PATH", "/v1/agents/run")
-MANUS_TIMEOUT_S = float(os.getenv("MANUS_TIMEOUT_S", "120"))
-
-# OpenAI (optional)
+# OpenAI (primary for this build)
 OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL     = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
 OPENAI_CHAT_URL  = os.getenv("OPENAI_CHAT_URL", "https://api.openai.com/v1/chat/completions").strip()
 OPENAI_TIMEOUT_S = float(os.getenv("OPENAI_TIMEOUT_S", "60"))
 
-# Thin-result enrichment (optional)
+# Thin-result enrichment
 ENRICH_ON_THIN   = os.getenv("ENRICH_ON_THIN", "true").lower() == "true"
 THIN_MIN_SIGNALS = int(os.getenv("THIN_MIN_SIGNALS", "2"))
 
-# -------------------- Category heuristics (for differentiation) --------------------
+# -------------------- Category heuristics --------------------
 ATHLETIC_KEYWORDS = {"nike","adidas","puma","under armour","underarmor","asics","new balance","reebok"}
 STREETWEAR_KEYWORDS = {"stüssy","stussy","supreme","kith","palace","huf","pleasures","the hundreds","anti social social club","bape","a bathing ape","crooks","crooks & castles","bbc","ice cream","billionaire boys club","carrots","ksubi","paper planes"}
 
@@ -136,149 +141,143 @@ def competitor_focus_points(category: str) -> List[str]:
         return ["drop cadence/story","PDP media richness","collab/editorial hubs","community/UGC"]
     return ["value clarity/entry price","PDP trust (reviews/size)","checkout speed (express pays)"]
 
-# -------------------- Manus/OpenAI plumbing --------------------
-def normalize_from_manus(brand: Brand, comps: List[Competitor], raw: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    sections = {
-        "weekly_report": raw.get("weekly_report") or {},
-        "cultural_radar": raw.get("cultural_radar") or {},
-        "peer_tracker": raw.get("peer_tracker") or {},
-        "warnings": raw.get("warnings") or []
-    }
-    signals: List[Dict[str, Any]] = []
+# -------------------- Report Extraction (files or text) --------------------
+def extract_text_from_upload(content: bytes, filename: str) -> str:
+    name = (filename or "").lower()
+    if name.endswith(".pdf"):
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(content))
+            return "\n".join([p.extract_text() or "" for p in reader.pages])
+        except Exception as e:
+            return f"[pdf_read_error:{e}]"
+    if name.endswith(".docx"):
+        try:
+            import docx
+            d = docx.Document(io.BytesIO(content))
+            return "\n".join([p.text for p in d.paragraphs])
+        except Exception as e:
+            return f"[docx_read_error:{e}]"
+    if name.endswith(".csv"):
+        try:
+            text = content.decode("utf-8", errors="ignore")
+            return text
+        except Exception as e:
+            return f"[csv_decode_error:{e}]"
+    # default to text
+    try:
+        return content.decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
 
-    # Weekly highlights + opportunities
-    for hl in (sections["weekly_report"].get("engagement_highlights") or [])[:10]:
-        signals.append({
-            "brand": brand.name or "Unknown",
-            "competitor": "",
-            "signal": f"Engagement highlight: {hl.get('why_it_matters','')}",
-            "score": 65,
-            "note": f"source: manus | section: weekly_report | link: {hl.get('link','')}"
-        })
-    for opp in (sections["weekly_report"].get("opportunities_risks") or [])[:10]:
-        impact = (opp.get("impact") or "medium").lower()
-        score = {"high":85,"medium":65,"low":45}.get(impact, 60)
-        signals.append({
-            "brand": brand.name or "Unknown",
-            "competitor": "",
-            "signal": f"{opp.get('type','opportunity').title()}: {opp.get('insight','')}",
-            "score": score,
-            "note": "source: manus | section: weekly_report"
-        })
+SECTION_HINTS = [
+    ("Brand Mentions Overview", r"brand mentions overview[:\-\n]?", 1.0),
+    ("Customer Sentiment", r"customer sentiment[:\-\n]?", 1.0),
+    ("Engagement Highlights", r"engagement highlights[:\-\n]?", 1.0),
+    ("Streetwear Trends", r"(streetwear|trend)\s+(themes|trends)[:\-\n]?", 0.8),
+    ("Competitive Mentions", r"competitive mentions[:\-\n]?", 0.9),
+    ("Opportunities & Risks", r"opportunities\s*&\s*risks[:\-\n]?", 1.0),
+    ("Creators", r"(creators|influencers)[:\-\n]?", 0.8),
+    ("Peer Tracker", r"(peer\s+tracker|scorecard)[:\-\n]?", 0.8),
+]
 
-    # Cultural radar: creators
-    for c in (sections["cultural_radar"].get("creators") or [])[:5]:
-        signals.append({
-            "brand": brand.name or "Unknown",
-            "competitor": "",
-            "signal": f"Creator: {c.get('creator','')} ({c.get('platform','')})",
-            "score": int(round((c.get("influence_score") or 0))),
-            "note": f"source: manus | section: cultural_radar | profile: {c.get('profile','')}"
-        })
-
-    # Peer tracker deltas
-    sc = (sections["peer_tracker"].get("scorecard") or {}).get("scores") or []
-    focal = [s for s in sc if _slug(s.get("brand")) == _slug(brand.name)]
-    for c in comps[:8]:
-        cname = c.name or ""
-        peer_rows = [s for s in sc if _slug(s.get("brand")) == _slug(cname)]
-        for dim in {"Homepage","PDP","Checkout","ContentCommunity","MobileUX","PricePresentation"}:
-            cs = next((s for s in focal if s.get("dimension")==dim), None)
-            ps = next((s for s in peer_rows if s.get("dimension")==dim), None)
-            if cs and ps and isinstance(cs.get("score"), (int,float)) and isinstance(ps.get("score"), (int,float)):
-                delta = float(ps["score"]) - float(cs["score"])
-                if abs(delta) >= 1.0:
-                    tag = "Behind" if delta>0 else "Ahead"
-                    signals.append({
-                        "brand": brand.name or "Unknown",
-                        "competitor": cname,
-                        "signal": f"{tag} on {dim} by {abs(delta):.1f}",
-                        "score": 60,
-                        "note": "source: manus | section: peer_tracker"
-                    })
-    return signals, sections
-
-def synthesize_brand_strategy(brand: Brand, comps: List[Competitor], sections: Dict[str, Any]) -> List[Dict[str, Any]]:
-    cat = infer_category(brand, comps)
-    signals: List[Dict[str, Any]] = []
-    for a in audience_archetypes(cat):
-        signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Audience to activate: {a}", "score":55, "note": f"source: strategy | category: {cat}"})
-    for cp in creator_playbook(cat):
-        signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Creator play: {cp['type']} — {cp['activation']}", "score":58, "note": f"why: {cp['why']} | category: {cat} | source: strategy"})
-    for f in competitor_focus_points(cat):
-        signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Competitor focus area: {f}", "score":57, "note": f"category: {cat} | source: strategy"})
-    for opp in (sections.get("weekly_report", {}).get("opportunities_risks") or [])[:5]:
-        signals.append({
-            "brand": brand.name or "Unknown",
-            "competitor":"",
-            "signal": f"[{cat}] {opp.get('type','opportunity').title()}: {opp.get('insight','')}",
-            "score": {"high":85,"medium":65,"low":45}.get((opp.get("impact") or "medium").lower(), 60),
-            "note":"source: manus | section: weekly_report"
-        })
-    return signals
-
-def is_thin(rows: List[Dict[str, Any]]) -> bool:
-    if not rows: return True
-    meaningful = [r for r in rows if (r.get("signal") or "").strip().lower() not in ("", "no insights")]
-    return len(meaningful) < THIN_MIN_SIGNALS
-
-def fallback_rows(brand: Brand, comps: List[Competitor], note: str) -> List[Dict[str, Any]]:
-    b = (brand.name or "").strip() or "Unknown Brand"
-    out: List[Dict[str, Any]] = []
-    cat = infer_category(brand, comps)
-    if not comps:
-        out.append({"brand": b, "competitor":"", "signal":"Add competitors for better differentiation", "score":0, "note": f"source: fallback ({note})"})
-    else:
-        for c in comps:
-            out.append({"brand": b, "competitor": c.name or "Unnamed", "signal": f"Baseline comparison — category {cat}", "score": 50, "note": f"source: fallback ({note})"})
-    out += [dict(s, note=(s.get("note","") + " | fallback")) for s in synthesize_brand_strategy(brand, comps, {"weekly_report":{}})[:6]]
+def crude_sections(text: str) -> Dict[str, str]:
+    """Split the pasted report into rough sections based on headings."""
+    out: Dict[str, str] = {}
+    norm = text or ""
+    for title, rx, _w in SECTION_HINTS:
+        m = re.search(rx, norm, flags=re.I)
+        if m:
+            start = m.end()
+            # find next heading or end
+            next_idx = len(norm)
+            for _, rx2, _w2 in SECTION_HINTS:
+                if rx2 == rx: continue
+                m2 = re.search(rx2, norm[m.end():], flags=re.I)
+                if m2:
+                    next_idx = min(next_idx, m.end() + m2.start())
+            out[title] = norm[start:next_idx].strip()
+    if not out:
+        out["Full Report"] = norm.strip()
     return out
 
-def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    if not (MANUS_API_KEY and MANUS_BASE_URL and MANUS_AGENT_ID):
-        raise RuntimeError("Manus not configured")
-    payload = {
-        "agent_id": MANUS_AGENT_ID,
-        "brand": req.brand.dict(),
-        "competitors": [c.dict() for c in req.competitors],
-        "mode": req.mode or "all",
-        "window_days": req.window_days or 7,
-        "context": {"source":"signal-scale","version":"2.8.0"}
-    }
-    headers = {"Authorization": f"Bearer {MANUS_API_KEY}", "Content-Type": "application/json"}
-    url = f"{MANUS_BASE_URL}{MANUS_RUN_PATH}"
-    with httpx.Client(timeout=MANUS_TIMEOUT_S) as client:
-        r = client.post(url, headers=headers, json=payload)
-        r.raise_for_status()
-        data = r.json() if r.headers.get("content-type","").startswith("application/json") else {"raw": r.text}
-    rows, sections = normalize_from_manus(req.brand, req.competitors, data)
-    if ENRICH_ON_THIN and is_thin(rows):
-        rows += synthesize_brand_strategy(req.brand, req.competitors, sections)[:10]
-    return rows, sections
+def insights_from_sections(brand: Brand, comps: List[Competitor], sections: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Turn extracted sections into structured, renderable rows."""
+    cat = infer_category(brand, comps)
+    rows: List[Dict[str, Any]] = []
 
-def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
+    # Heuristic pulls
+    if "Brand Mentions Overview" in sections:
+        rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal":"Mentions trend noted (see overview)", "score":60, "note":"source: report | section: Brand Mentions Overview"})
+
+    if "Customer Sentiment" in sections:
+        tx = sections["Customer Sentiment"].lower()
+        score = 70
+        if "negative" in tx and "positive" not in tx: score = 40
+        elif "positive" in tx and "negative" not in tx: score = 80
+        rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal":"Customer sentiment shift detected", "score":score, "note":"source: report | section: Customer Sentiment"})
+
+    if "Engagement Highlights" in sections:
+        highlights = sections["Engagement Highlights"].split("\n")
+        for h in highlights[:5]:
+            h = h.strip()
+            if len(h) > 6:
+                rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal":f"Engagement: {h[:120]}", "score":65, "note":"source: report | section: Engagement Highlights"})
+
+    if "Competitive Mentions" in sections:
+        for c in comps[:6]:
+            n = (c.name or "").lower()
+            if n and n in sections["Competitive Mentions"].lower():
+                rows.append({"brand": brand.name or "Unknown", "competitor":c.name, "signal":"Brand is mentioned vs this competitor", "score":58, "note":"source: report | section: Competitive Mentions"})
+
+    if "Opportunities & Risks" in sections:
+        lines = [ln.strip("-• ").strip() for ln in sections["Opportunities & Risks"].split("\n") if ln.strip()]
+        for ln in lines[:6]:
+            rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal":ln[:140], "score":70, "note":"source: report | section: Opportunities & Risks"})
+
+    # Category-aware creator & focus scaffolding
+    for a in audience_archetypes(cat):
+        rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Audience to activate: {a}", "score":55, "note": f"category: {cat} | source: strategy"})
+    for cp in creator_playbook(cat):
+        rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Creator play: {cp['type']} — {cp['activation']}", "score":58, "note": f"why: {cp['why']} | category: {cat} | source: strategy"})
+    for f in competitor_focus_points(cat):
+        rows.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Competitor focus: {f}", "score":57, "note": f"category: {cat} | source: strategy"})
+
+    # Dedupe by (competitor, signal)
+    seen = set()
+    uniq: List[Dict[str, Any]] = []
+    for r in rows:
+        key = (_slug(r.get("competitor")), _slug(r.get("signal")))
+        if key in seen: continue
+        seen.add(key)
+        uniq.append(r)
+    return uniq
+
+# -------------------- OpenAI synthesis (optional but recommended) --------------------
+def call_openai_structured(brand: Brand, comps: List[Competitor], sections: Dict[str, str]) -> List[Dict[str, Any]]:
     if not OPENAI_API_KEY:
-        raise RuntimeError("OpenAI not configured")
-    category = infer_category(req.brand, req.competitors)
+        return []
     sys_msg = {
-        "role": "system",
-        "content": (
+        "role":"system",
+        "content":(
             "You are a competitive intelligence analyst. Return STRICT JSON only with shape: "
             '{"insights":[{"competitor":"","title":"","score":0,"note":""}]}. '
-            "Differentiate by brand category and competitor context. No markdown, no prose."
+            "Differentiate by brand category and competitor context. No markdown or prose."
         )
     }
-    user_payload = {
-        "brand": req.brand.dict(),
-        "competitors": [c.dict() for c in req.competitors],
-        "category_hint": category
+    payload = {
+        "brand": brand.dict(),
+        "competitors": [c.dict() for c in comps],
+        "sections": sections
     }
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
-    body = {"model": OPENAI_MODEL, "messages": [sys_msg, {"role": "user", "content": json.dumps(user_payload)}], "temperature": 0.2}
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type":"application/json"}
+    body = {"model": OPENAI_MODEL, "messages":[sys_msg, {"role":"user","content":json.dumps(payload)}], "temperature":0.2}
+
     with httpx.Client(timeout=OPENAI_TIMEOUT_S) as client:
         r = client.post(OPENAI_CHAT_URL, headers=headers, json=body)
         r.raise_for_status()
         data = r.json()
+
     text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content")) or "{}"
     out: List[Dict[str, Any]] = []
     try:
@@ -287,153 +286,140 @@ def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
             score_val = it.get("score", 0)
             score = int(score_val) if isinstance(score_val, (int, float)) else 0
             out.append({
-                "brand": req.brand.name or "Unknown",
+                "brand": brand.name or "Unknown",
                 "competitor": it.get("competitor",""),
                 "signal": it.get("title",""),
                 "score": score,
                 "note": f"source: openai | {it.get('note','')}"
             })
     except Exception:
-        out.append({
-            "brand": req.brand.name or "Unknown",
-            "competitor": "",
-            "signal": f"Category-driven next move ({category})",
-            "score": 55,
-            "note": "source: openai | parse_fallback"
-        })
+        pass
     return out
 
-# -------------------- Core orchestration --------------------
+# -------------------- Core --------------------
 def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
-    errors: List[str] = []
-    rows: List[Dict[str, Any]] = []
-    sections: Dict[str, Any] = {}
+    # 1) Gather text: pasted reports (and, if you add, uploaded files)
+    joined = "\n\n".join([t for t in req.reports if t and t.strip()])
+    sections = crude_sections(joined) if joined else {}
 
-    for p in PROVIDER_ORDER:
+    # 2) Heuristic insights from sections (works even without OpenAI)
+    rows = insights_from_sections(req.brand, req.competitors, sections)
+
+    # 3) OpenAI synthesis (if available) to sharpen and brand-differentiate further
+    if "openai" in PROVIDER_ORDER:
         try:
-            if p == "manus":
-                rows, sections = call_manus(req)
-                if rows: break
-            elif p == "openai":
-                rows = call_openai(req)
-                if rows: break
+            ai_rows = call_openai_structured(req.brand, req.competitors, sections)
+            rows = _merge_rows(rows, ai_rows)
         except Exception as e:
-            errors.append(f"{p}: {type(e).__name__}: {str(e)[:200]}")
-            continue
+            print(f"[openai_error] {type(e).__name__}: {e}", flush=True)
 
-    if not rows:
-        note = " | ".join(errors) if errors else "no provider configured"
-        rows = fallback_rows(req.brand, req.competitors, note=note)
-        sections = {"weekly_report":{}, "cultural_radar":{}, "peer_tracker":{}, "warnings":[note]}
+    # 4) Enrich if thin
+    if ENRICH_ON_THIN and is_thin(rows):
+        # Add a few category scaffolds again (guarantee something shows)
+        rows = _merge_rows(rows, insights_from_sections(req.brand, req.competitors, sections)[:8])
 
-    # small category-aware strategy set for differentiation
-    strategy = synthesize_brand_strategy(req.brand, req.competitors, sections)[:12]
-
-    # dedupe by (competitor, signal)
-    seen = set()
-    final_rows: List[Dict[str, Any]] = []
-    for r in rows + strategy:
-        key = (_slug(r.get("competitor")), _slug(r.get("signal")))
-        if key in seen: continue
-        seen.add(key)
-        final_rows.append(r)
-
+    # 5) Final payload
     return {
         "ok": True,
         "brand": req.brand.dict(),
         "competitors_count": len(req.competitors),
         "category_inferred": infer_category(req.brand, req.competitors),
-        "signals": final_rows,
+        "signals": rows,
         "sections": sections
     }
 
-# -------------------- Handlers (single source of truth) --------------------
-def analyze_handler(req: AnalyzeRequest, _=Depends(require_api_key)):
+def _merge_rows(a: List[Dict[str, Any]], b: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = {(_slug(x.get("competitor")), _slug(x.get("signal"))) for x in a}
+    out = list(a)
+    for r in b:
+        key = (_slug(r.get("competitor")), _slug(r.get("signal")))
+        if key not in seen:
+            out.append(r); seen.add(key)
+    return out
+
+def is_thin(rows: List[Dict[str, Any]]) -> bool:
+    if not rows: return True
+    meaningful = [r for r in rows if (r.get("signal") or "").strip()]
+    return len(meaningful) < THIN_MIN_SIGNALS
+
+# -------------------- API --------------------
+@app.get(f"{API_PREFIX}/health")
+def health():
+    return {
+        "ok": True,
+        "service": "signal-scale",
+        "version": "3.0.0",
+        "keys_enabled": bool(APP_API_KEYS),
+        "openai_configured": bool(OPENAI_API_KEY),
+        "provider_order": PROVIDER_ORDER
+    }
+
+@app.get("/api/health")
+def health_legacy(): return health()
+@app.get("/health")
+def health_alias():  return health()
+
+# Ingest: upload files (PDF/DOCX/TXT/CSV). Returns extracted text chunks for you to feed into analyze.
+@app.post(f"{API_PREFIX}/intelligence/ingest")
+async def ingest_files(files: List[UploadFile] = File(...), _=Depends(require_api_key)):
+    blobs: List[str] = []
+    for f in files:
+        data = await f.read()
+        text = extract_text_from_upload(data, f.filename)
+        if text and text.strip():
+            blobs.append(text[:200000])  # guard huge files
+    # Return uniformly so the frontend can stuff this into AnalyzeRequest.reports
+    return {"ok": True, "reports": blobs, "count": len(blobs)}
+
+# Analyze (prefixed)
+@app.post(f"{API_PREFIX}/intelligence/analyze")
+def analyze_prefixed(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return _analyze_response(req)
+
+# Analyze (alias without prefix)
+@app.post("/intelligence/analyze")
+def analyze_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return _analyze_response(req)
+
+def _analyze_response(req: AnalyzeRequest) -> Dict[str, Any]:
     result = analyze_core(req)
     signals = result.get("signals", [])
-
-    # UI-friendly projections
-    insights = [{
-        "competitor": r.get("competitor", ""),
-        "title": r.get("signal", ""),
-        "score": r.get("score", 0),
-        "note": r.get("note", "")
-    } for r in signals]
-
+    insights = [{"competitor": r.get("competitor",""), "title": r.get("signal",""), "score": r.get("score",0), "note": r.get("note","")} for r in signals]
     summary = {
         "brand": result.get("brand", {}).get("name") or "Unknown",
         "competitors_count": result.get("competitors_count", 0),
         "category": result.get("category_inferred", "unknown"),
         "insight_count": len(insights)
     }
-
     payload = dict(result)
-    payload["insights"] = insights              # primary UI key
+    payload["insights"] = insights
     payload["summary"]  = summary
-    # extra aliases some bundles expect
+    # aliases for any legacy UI bundle keys
     payload["results"]  = insights
     payload["data"]     = insights
     payload["items"]    = insights
     return payload
 
-def export_handler(req: AnalyzeRequest, _=Depends(require_api_key)):
+# CSV export (uses analyze_core internally)
+@app.post(f"{API_PREFIX}/intelligence/export")
+def export_prefixed(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return _export_csv(req)
+@app.post("/intelligence/export")
+def export_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return _export_csv(req)
+
+def _export_csv(req: AnalyzeRequest):
     result = analyze_core(req)
     rows = result.get("signals", [])
     buf = io.StringIO()
     fieldnames = ["brand","competitor","signal","score","note"]
     w = csv.DictWriter(buf, fieldnames=fieldnames); w.writeheader()
-    for r in rows: w.writerow({k: r.get(k,"") for k in fieldnames})
-    return StreamingResponse(
-        io.BytesIO(buf.getvalue().encode("utf-8")),
+    for r in rows:
+        w.writerow({k: r.get(k,"") for k in fieldnames})
+    return StreamingResponse(io.BytesIO(buf.getvalue().encode("utf-8")),
         media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename=\"signal_scale_export.csv\"'}
+        headers={"Content-Disposition": 'attachment; filename="signal_scale_export.csv"'}
     )
-
-# -------------------- Routes (with and without /api prefix) --------------------
-@app.get(f"{API_PREFIX}/health")
-def health():
-    return {
-        "ok": True,
-        "service": "signal-scale",
-        "version": "2.8.0",
-        "keys_enabled": bool(APP_API_KEYS),
-        "manus_configured": bool(MANUS_API_KEY),
-        "openai_configured": bool(OPENAI_API_KEY),
-        "provider_order": PROVIDER_ORDER
-    }
-
-@app.get("/api/health")        # keep legacy fixed path too
-def health_legacy():
-    return health()
-
-@app.get("/health")            # super-legacy
-def health_alias():
-    return health()
-
-# Analyze / Export — prefixed
-@app.post(f"{API_PREFIX}/intelligence/analyze")
-def analyze_prefixed(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return analyze_handler(req, _)
-
-@app.post(f"{API_PREFIX}/intelligence/export")
-def export_prefixed(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return export_handler(req, _)
-
-# Analyze / Export — no prefix aliases (for older frontends)
-@app.post("/intelligence/analyze")
-def analyze_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return analyze_handler(req, _)
-
-@app.post("/intelligence/export")
-def export_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return export_handler(req, _)
-
-# Simple debug: plaintext peek
-@app.get("/debug", response_class=PlainTextResponse)
-def debug(_=Depends(require_api_key)):
-    demo = analyze_core(AnalyzeRequest(brand=Brand(name="Demo Brand"), competitors=[Competitor(name="Peer A"), Competitor(name="Peer B")]))
-    insights = [{"title": r.get("signal",""), "competitor": r.get("competitor","")} for r in demo.get("signals", [])[:5]]
-    return f"category={demo.get('category_inferred')} insights_sample={json.dumps(insights)}"
 
 # -------------------- Frontend (serve / + assets) --------------------
 def find_web_dir() -> str:
@@ -442,12 +428,12 @@ def find_web_dir() -> str:
         return override
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(base_dir, "web"),                         # src/api/web
-        os.path.join(base_dir, "..", "web"),                   # src/web
-        os.path.join(base_dir, "..", "..", "web"),             # repo-root/web
-        os.path.join(base_dir, "..", "..", "frontend", "dist"),# repo-root/frontend/dist
-        os.path.join(os.getcwd(), "frontend", "dist"),         # CWD/frontend/dist
-        os.path.join(os.getcwd(), "web"),                      # CWD/web
+        os.path.join(base_dir, "web"),
+        os.path.join(base_dir, "..", "web"),
+        os.path.join(base_dir, "..", "..", "web"),
+        os.path.join(base_dir, "..", "..", "frontend", "dist"),
+        os.path.join(os.getcwd(), "frontend", "dist"),
+        os.path.join(os.getcwd(), "web"),
     ]
     for c in map(os.path.abspath, candidates):
         if os.path.exists(os.path.join(c, "index.html")):
@@ -456,7 +442,6 @@ def find_web_dir() -> str:
 
 WEB_DIR = find_web_dir()
 INDEX_HTML = os.path.join(WEB_DIR, "index.html")
-
 print(f"[startup] USING WEB_DIR={WEB_DIR} exists={os.path.isdir(WEB_DIR)}", flush=True)
 print(f"[startup] INDEX_HTML exists={os.path.exists(INDEX_HTML)}", flush=True)
 
@@ -464,6 +449,8 @@ assets_dir = os.path.join(WEB_DIR, "assets")
 if os.path.isdir(assets_dir):
     app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+DOC_PATHS = {"/openapi.json", "/docs", "/docs/index.html", "/redoc", "/favicon.ico"}
 
 @app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def root():
@@ -473,7 +460,8 @@ def root():
 
 @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def spa_fallback(full_path: str):
-    if full_path.startswith("api") or full_path.startswith("v1") or full_path.startswith("intelligence"):
+    p = "/" + (full_path or "")
+    if p in DOC_PATHS or p.startswith("/api") or p.startswith("/v1") or p.startswith("/intelligence"):
         raise HTTPException(status_code=404, detail="Not found")
     if not os.path.exists(INDEX_HTML):
         return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected: <code>{INDEX_HTML}</code></p>", status_code=500)
