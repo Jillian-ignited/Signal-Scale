@@ -1,4 +1,4 @@
-# main.py — Signal & Scale API (v2.6.0)
+# main.py — Signal & Scale API (v2.7.0)
 # Dependencies: fastapi, uvicorn[standard], httpx, pydantic
 
 import os, io, csv, json, sys
@@ -7,13 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # -------------------- App --------------------
-app = FastAPI(title="Signal & Scale", version="2.6.0")
+app = FastAPI(title="Signal & Scale", version="2.7.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
@@ -25,7 +25,7 @@ async def log_requests(request: Request, call_next):
     print(f"{request.method} {request.url.path} -> {resp.status_code}", flush=True)
     return resp
 
-# -------------------- Auth (your customers’ keys) --------------------
+# -------------------- Auth (your customers’ app keys) --------------------
 def _load_keys(env_name: str) -> List[str]:
     raw = os.getenv(env_name, "").strip()
     if not raw:
@@ -62,7 +62,7 @@ class AnalyzeRequest(BaseModel):
     class Config:
         extra = "ignore"
 
-# Clear 422s with body echo
+# Better 422 visibility
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     try:
@@ -88,7 +88,7 @@ OPENAI_CHAT_URL  = os.getenv("OPENAI_CHAT_URL", "https://api.openai.com/v1/chat/
 OPENAI_TIMEOUT_S = float(os.getenv("OPENAI_TIMEOUT_S", "60"))
 
 # Thin-result enrichment (optional)
-ENRICH_ON_THIN   = os.getenv("ENRICH_ON_THIN", "false").lower() == "true"
+ENRICH_ON_THIN   = os.getenv("ENRICH_ON_THIN", "true").lower() == "true"
 THIN_MIN_SIGNALS = int(os.getenv("THIN_MIN_SIGNALS", "2"))
 
 # -------------------- Category heuristics (for differentiation) --------------------
@@ -256,7 +256,7 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
         "competitors": [c.dict() for c in req.competitors],
         "mode": req.mode or "all",
         "window_days": req.window_days or 7,
-        "context": {"source":"signal-scale","version":"2.6.0"}
+        "context": {"source":"signal-scale","version":"2.7.0"}
     }
     headers = {"Authorization": f"Bearer {MANUS_API_KEY}", "Content-Type": "application/json"}
     url = f"{MANUS_BASE_URL}{MANUS_RUN_PATH}"
@@ -270,7 +270,7 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
     return rows, sections
 
 def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
-    """Simple brand-differentiated fallback using OpenAI Chat Completions."""
+    """Brand-differentiated fallback via OpenAI Chat Completions."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OpenAI not configured")
     category = infer_category(req.brand, req.competitors)
@@ -369,7 +369,7 @@ def health():
     return {
         "ok": True,
         "service": "signal-scale",
-        "version": "2.6.0",
+        "version": "2.7.0",
         "keys_enabled": bool(APP_API_KEYS),
         "manus_configured": bool(MANUS_API_KEY),
         "openai_configured": bool(OPENAI_API_KEY),
@@ -396,7 +396,32 @@ def openai_check(_=Depends(require_api_key)):
 
 @app.post("/api/intelligence/analyze")
 def analyze(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return analyze_core(req)
+    result = analyze_core(req)
+
+    # Original shape
+    signals = result.get("signals", [])
+
+    # UI-compat alias: insights[] with title
+    insights = []
+    for r in signals:
+        insights.append({
+            "competitor": r.get("competitor", ""),
+            "title": r.get("signal", ""),
+            "score": r.get("score", 0),
+            "note": r.get("note", "")
+        })
+
+    summary = {
+        "brand": result.get("brand", {}).get("name") or "Unknown",
+        "competitors_count": result.get("competitors_count", 0),
+        "category": result.get("category_inferred", "unknown"),
+        "insight_count": len(insights)
+    }
+
+    payload = dict(result)
+    payload["insights"] = insights
+    payload["summary"] = summary
+    return payload
 
 @app.post("/api/intelligence/export")
 def export_csv(req: AnalyzeRequest, _=Depends(require_api_key)):
@@ -412,6 +437,13 @@ def export_csv(req: AnalyzeRequest, _=Depends(require_api_key)):
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename=\"signal_scale_export.csv\"'}
     )
+
+# Simple debug: echoes category + first 5 insights as plaintext
+@app.get("/debug", response_class=PlainTextResponse)
+def debug(_=Depends(require_api_key)):
+    demo = analyze_core(AnalyzeRequest(brand=Brand(name="Demo Brand"), competitors=[Competitor(name="Peer A"), Competitor(name="Peer B")]))
+    insights = [{"title": r.get("signal",""), "competitor": r.get("competitor","")} for r in demo.get("signals", [])[:5]]
+    return f"category={demo.get('category_inferred')} insights_sample={json.dumps(insights)}"
 
 # -------------------- Frontend (serve / + assets) --------------------
 def find_web_dir() -> str:
