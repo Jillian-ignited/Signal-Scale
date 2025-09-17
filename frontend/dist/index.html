@@ -2,111 +2,161 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Signal & Scale — Dashboard</title>
+  <title>Signal & Scale — Competitive Intelligence</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Tailwind CDN (no build step) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            bg: '#0b0c10',
-            panel: '#12141c',
-            card: '#171a24',
-            text: '#e8eef5',
-            muted: '#95a3b1',
-            accent: '#67d39b',
-            border: '#252b39'
-          },
-          boxShadow: {
-            soft: '0 10px 40px rgba(0,0,0,.25)'
-          },
-          borderRadius: {
-            xl2: '14px'
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="stylesheet" href="./report.css" />
+  <link href="./styles.css" rel="stylesheet" />
+  <!-- Chart.js for visuals -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body class="bg-[radial-gradient(1200px_600px_at_60%_-10%,#182031_0,transparent_60%),linear-gradient(180deg,#0b0c10,#0c1018)] text-text">
-  <div class="max-w-6xl mx-auto px-4 py-8">
-    <header class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-semibold tracking-tight">Signal & Scale</h1>
-      <div class="flex items-center gap-2">
-        <span id="healthPill" class="px-3 py-1.5 rounded-full text-xs bg-[#1b2030] text-muted">checking…</span>
-        <button id="exportPdfBtn" class="hidden md:inline-flex items-center gap-2 bg-accent text-[#05210e] font-semibold px-3 py-2 rounded-lg">Export PDF</button>
+<body>
+  <aside class="sidebar">
+    <div class="logo">Signal<span>&</span>Scale</div>
+    <nav>
+      <button class="nav active" data-target="#dashboard">Dashboard</button>
+      <button class="nav" data-target="#insights">Insights</button>
+      <button class="nav" data-target="#report">Report</button>
+    </nav>
+    <div class="foot">
+      <span id="pill" class="pill">checking…</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1>Competitive Intelligence</h1>
+        <p id="subtitle" class="sub">Set brand + peers → Analyze</p>
+      </div>
+      <div class="actions">
+        <button id="exportCsvBtn" class="btn">Export CSV</button>
+        <button id="exportPdfBtn" class="btn accent">Export PDF</button>
       </div>
     </header>
 
-    <!-- Controls -->
-    <section class="grid md:grid-cols-2 gap-4 mb-6">
-      <div class="bg-card border border-border rounded-xl2 p-4 shadow-soft">
-        <div class="flex items-center gap-2 mb-3">
-          <input id="apiKey" placeholder="App Key (optional)" class="flex-1 bg-[#0f1219] border border-border rounded-lg px-3 py-2" />
-          <button id="saveKeyBtn" class="bg-[#2a3142] text-text px-3 py-2 rounded-lg">Save</button>
-          <span id="status" class="text-xs text-muted"></span>
-        </div>
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="page active">
+      <div class="grid">
+        <div class="card">
+          <div class="section-title">Configuration</div>
 
-        <label class="block text-sm font-medium text-[#c8d6e6]">Brand</label>
-        <div class="flex gap-2 mt-1">
-          <input id="brandName" placeholder="e.g., Crooks & Castles" class="flex-1 bg-[#0f1219] border border-border rounded-lg px-3 py-2" />
-          <input id="brandUrl" placeholder="https://brand.com" class="flex-1 bg-[#0f1219] border border-border rounded-lg px-3 py-2" />
-        </div>
-
-        <label class="block text-sm font-medium text-[#c8d6e6] mt-3">Competitors (one per line, optional URL after a pipe)</label>
-        <textarea id="competitors" class="w-full bg-[#0f1219] border border-border rounded-lg px-3 py-2 mt-1 min-h-[100px]" placeholder="Stussy | https://www.stussy.com&#10;HUF | https://hufworldwide.com"></textarea>
-
-        <label class="block text-sm font-medium text-[#c8d6e6] mt-3">Paste report (optional)</label>
-        <textarea id="reportText" class="w-full bg-[#0f1219] border border-border rounded-lg px-3 py-2 mt-1 min-h-[100px]" placeholder="Paste weekly notes/report to guide analysis"></textarea>
-
-        <div class="flex items-center gap-2 mt-3">
-          <button id="analyzeBtn" class="bg-accent text-[#05210e] font-semibold px-4 py-2 rounded-lg">Analyze</button>
-          <button id="exportCsvBtn" class="bg-[#2a3142] text-text px-4 py-2 rounded-lg">Export CSV</button>
-        </div>
-      </div>
-
-      <div class="bg-card border border-border rounded-xl2 p-4 shadow-soft">
-        <div class="flex items-center justify-between">
-          <div>
-            <div id="summaryBrand" class="text-lg font-semibold">—</div>
-            <div class="mt-2 flex flex-wrap gap-2 text-sm">
-              <span id="kvCategory" class="px-2 py-1 rounded-lg bg-[#111520] border border-border text-muted">category: —</span>
-              <span id="kvCount" class="px-2 py-1 rounded-lg bg-[#111520] border border-border text-muted">insights: 0</span>
-              <span id="kvData" class="px-2 py-1 rounded-lg bg-[#111520] border border-border text-muted">data: —</span>
+          <div class="form-row">
+            <label>App Key (optional)</label>
+            <div class="row gap">
+              <input id="apiKey" class="input" placeholder="App key if you locked the API" />
+              <button id="saveKeyBtn" class="btn">Save</button>
+              <span id="status" class="status"></span>
             </div>
           </div>
+
+          <div class="form-row">
+            <label>Brand</label>
+            <div class="row gap">
+              <input id="brandName" class="input" placeholder="e.g., Crooks & Castles" />
+              <input id="brandUrl" class="input" placeholder="https://brand.com" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label>Competitors (one per line — optional URL after a pipe)</label>
+            <textarea id="competitors" class="input area" placeholder="Stüssy | https://www.stussy.com
+HUF | https://hufworldwide.com"></textarea>
+          </div>
+
+          <div class="form-row">
+            <label>Context (paste weekly notes, optional)</label>
+            <textarea id="reportText" class="input area" placeholder="Key observations, launches, sentiment notes…"></textarea>
+          </div>
+
+          <div class="row gap">
+            <button id="analyzeBtn" class="btn accent">Analyze</button>
+          </div>
         </div>
-        <div class="mt-4">
-          <canvas id="insightsChart" height="120" class="w-full"></canvas>
+
+        <div class="card">
+          <div class="section-title">Overview</div>
+          <div class="kvs">
+            <div class="kv">
+              <div class="kv-label">Brand</div>
+              <div id="kvBrand" class="kv-value">—</div>
+            </div>
+            <div class="kv">
+              <div class="kv-label">Category</div>
+              <div id="kvCategory" class="kv-value">—</div>
+            </div>
+            <div class="kv">
+              <div class="kv-label">Insights</div>
+              <div id="kvCount" class="kv-value">0</div>
+            </div>
+            <div class="kv">
+              <div class="kv-label">Data Sources</div>
+              <div id="kvData" class="kv-value">—</div>
+            </div>
+          </div>
+
+          <div class="chart-block">
+            <canvas id="chartByCompetitor" height="130"></canvas>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Results -->
-    <section id="reportRoot" class="bg-card border border-border rounded-xl2 p-4 shadow-soft">
-      <h2 class="text-lg font-semibold mb-2">Insights</h2>
-      <div id="emptyState" class="text-sm text-muted">No insights yet. Click <b>Analyze</b>.</div>
-      <div class="overflow-x-auto">
-        <table id="resultsTable" class="min-w-full hidden">
-          <thead>
-            <tr class="text-left text-[#c6d2e2]">
-              <th class="border-b border-border py-2 pr-3">Competitor</th>
-              <th class="border-b border-border py-2 pr-3">Insight</th>
-              <th class="border-b border-border py-2 pr-3">Score</th>
-              <th class="border-b border-border py-2">Note</th>
-            </tr>
-          </thead>
-          <tbody id="resultsBody"></tbody>
-        </table>
+    <!-- INSIGHTS TABLE -->
+    <section id="insights" class="page">
+      <div class="card">
+        <div class="section-title">Insights</div>
+        <div id="emptyState" class="empty">No insights yet. Click <b>Analyze</b>.</div>
+        <div class="table-wrap">
+          <table id="resultsTable" class="table hide">
+            <thead>
+              <tr>
+                <th>Competitor</th>
+                <th>Insight</th>
+                <th>Score</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
-  </div>
 
-  <!-- Chart.js (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="./main.js"></script>
+    <!-- REPORT PREVIEW (rich, export-quality) -->
+    <section id="report" class="page">
+      <div class="report card" id="reportCard">
+        <div class="report-head">
+          <div>
+            <h2 id="rBrand">—</h2>
+            <div id="rMeta" class="muted"></div>
+          </div>
+          <div class="badge">Signal & Scale</div>
+        </div>
+
+        <div class="report-grid">
+          <div class="block">
+            <h3>Executive Summary</h3>
+            <div id="rSummary" class="muted">Run analysis to populate.</div>
+          </div>
+
+          <div class="block">
+            <h3>Top Recommendations</h3>
+            <ol id="rTop" class="list"></ol>
+          </div>
+
+          <div class="block span2">
+            <h3>Detailed Insights</h3>
+            <div id="rDetail" class="detail"></div>
+          </div>
+        </div>
+
+        <footer class="report-foot">
+          <div>Generated by Signal & Scale</div>
+          <div id="rDate"></div>
+        </footer>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
 </body>
 </html>
