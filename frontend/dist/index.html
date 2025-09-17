@@ -2,92 +2,111 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Signal & Scale</title>
+  <title>Signal & Scale — Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root { --bg:#0b0c10; --panel:#12141c; --card:#171a24; --text:#e8eef5; --muted:#95a3b1; --accent:#67d39b; --border:#252b39;}
-    * { box-sizing:border-box }
-    body { margin:0; background:linear-gradient(180deg,#0b0c10,#0c1018); color:var(--text); font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; }
-    .wrap { max-width:1100px; margin:36px auto; padding:0 16px; }
-    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-    h1 { margin:0; font-size:22px; letter-spacing:.2px }
-    .pill { padding:6px 10px; border-radius:999px; background:#1b2030; color:#b9c6d6; font-size:12px }
-    .ok { color:#7bd489 } .err { color:#ff8a8a }
-    .grid { display:grid; grid-template-columns:1fr 1.1fr; gap:16px }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.25) }
-    label { display:block; font-weight:600; margin:10px 0 6px; color:#c8d6e6 }
-    input, textarea { width:100%; background:#0f1219; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; outline:none }
-    textarea { min-height:120px; resize:vertical }
-    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center }
-    button { background:var(--accent); color:#05210e; font-weight:700; border:none; border-radius:10px; padding:10px 14px; cursor:pointer }
-    button.secondary { background:#2a3142; color:var(--text) }
-    .status { font-size:12px; color:var(--muted); margin-left:10px }
-    table { width:100%; border-collapse:collapse; margin-top:10px }
-    th, td { border-bottom:1px solid var(--border); padding:10px 8px; text-align:left; vertical-align:top }
-    th { color:#c6d2e2; font-weight:700 }
-    .summary { display:flex; align-items:center; justify-content:space-between; color:var(--muted) }
-    .kvs { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px }
-    .kv { background:#111520; padding:6px 8px; border:1px solid var(--border); border-radius:8px; font-size:12px }
-    @media (max-width: 900px) { .grid { grid-template-columns:1fr } }
-  </style>
+  <!-- Tailwind CDN (no build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0b0c10',
+            panel: '#12141c',
+            card: '#171a24',
+            text: '#e8eef5',
+            muted: '#95a3b1',
+            accent: '#67d39b',
+            border: '#252b39'
+          },
+          boxShadow: {
+            soft: '0 10px 40px rgba(0,0,0,.25)'
+          },
+          borderRadius: {
+            xl2: '14px'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="./report.css" />
 </head>
-<body>
-  <div class="wrap">
-    <header>
-      <h1>Signal & Scale</h1>
-      <span class="pill" id="healthPill">checking…</span>
+<body class="bg-[radial-gradient(1200px_600px_at_60%_-10%,#182031_0,transparent_60%),linear-gradient(180deg,#0b0c10,#0c1018)] text-text">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-semibold tracking-tight">Signal & Scale</h1>
+      <div class="flex items-center gap-2">
+        <span id="healthPill" class="px-3 py-1.5 rounded-full text-xs bg-[#1b2030] text-muted">checking…</span>
+        <button id="exportPdfBtn" class="hidden md:inline-flex items-center gap-2 bg-accent text-[#05210e] font-semibold px-3 py-2 rounded-lg">Export PDF</button>
+      </div>
     </header>
 
-    <div class="grid">
-      <div class="card">
-        <div class="row">
-          <input id="apiKey" placeholder="App Key (optional if server requires X-API-Key)" />
-          <button class="secondary" id="saveKeyBtn">Save Key</button>
-          <span id="status" class="status"></span>
+    <!-- Controls -->
+    <section class="grid md:grid-cols-2 gap-4 mb-6">
+      <div class="bg-card border border-border rounded-xl2 p-4 shadow-soft">
+        <div class="flex items-center gap-2 mb-3">
+          <input id="apiKey" placeholder="App Key (optional)" class="flex-1 bg-[#0f1219] border border-border rounded-lg px-3 py-2" />
+          <button id="saveKeyBtn" class="bg-[#2a3142] text-text px-3 py-2 rounded-lg">Save</button>
+          <span id="status" class="text-xs text-muted"></span>
         </div>
 
-        <label>Brand</label>
-        <div class="row">
-          <input id="brandName" placeholder="e.g., Crooks & Castles" />
-          <input id="brandUrl" placeholder="Brand URL (optional, e.g., https://crooksncastles.com)" />
+        <label class="block text-sm font-medium text-[#c8d6e6]">Brand</label>
+        <div class="flex gap-2 mt-1">
+          <input id="brandName" placeholder="e.g., Crooks & Castles" class="flex-1 bg-[#0f1219] border border-border rounded-lg px-3 py-2" />
+          <input id="brandUrl" placeholder="https://brand.com" class="flex-1 bg-[#0f1219] border border-border rounded-lg px-3 py-2" />
         </div>
 
-        <label>Competitors (one per line, use optional URL after a pipe)</label>
-        <textarea id="competitors" placeholder="Stussy | https://www.stussy.com
-HUF | https://hufworldwide.com"></textarea>
+        <label class="block text-sm font-medium text-[#c8d6e6] mt-3">Competitors (one per line, optional URL after a pipe)</label>
+        <textarea id="competitors" class="w-full bg-[#0f1219] border border-border rounded-lg px-3 py-2 mt-1 min-h-[100px]" placeholder="Stussy | https://www.stussy.com&#10;HUF | https://hufworldwide.com"></textarea>
 
-        <label>Paste report (optional)</label>
-        <textarea id="reportText" placeholder="Paste any weekly notes/report to guide analysis"></textarea>
+        <label class="block text-sm font-medium text-[#c8d6e6] mt-3">Paste report (optional)</label>
+        <textarea id="reportText" class="w-full bg-[#0f1219] border border-border rounded-lg px-3 py-2 mt-1 min-h-[100px]" placeholder="Paste weekly notes/report to guide analysis"></textarea>
 
-        <div class="row" style="margin-top:10px">
-          <button id="analyzeBtn">Analyze</button>
-          <button id="exportBtn" class="secondary">Export CSV</button>
+        <div class="flex items-center gap-2 mt-3">
+          <button id="analyzeBtn" class="bg-accent text-[#05210e] font-semibold px-4 py-2 rounded-lg">Analyze</button>
+          <button id="exportCsvBtn" class="bg-[#2a3142] text-text px-4 py-2 rounded-lg">Export CSV</button>
         </div>
       </div>
 
-      <div class="card">
-        <div class="summary">
+      <div class="bg-card border border-border rounded-xl2 p-4 shadow-soft">
+        <div class="flex items-center justify-between">
           <div>
-            <div id="summaryBrand">—</div>
-            <div class="kvs">
-              <div class="kv" id="kvCategory">category: —</div>
-              <div class="kv" id="kvCount">insights: 0</div>
-              <div class="kv" id="kvData">data: —</div>
+            <div id="summaryBrand" class="text-lg font-semibold">—</div>
+            <div class="mt-2 flex flex-wrap gap-2 text-sm">
+              <span id="kvCategory" class="px-2 py-1 rounded-lg bg-[#111520] border border-border text-muted">category: —</span>
+              <span id="kvCount" class="px-2 py-1 rounded-lg bg-[#111520] border border-border text-muted">insights: 0</span>
+              <span id="kvData" class="px-2 py-1 rounded-lg bg-[#111520] border border-border text-muted">data: —</span>
             </div>
           </div>
         </div>
+        <div class="mt-4">
+          <canvas id="insightsChart" height="120" class="w-full"></canvas>
+        </div>
+      </div>
+    </section>
 
-        <table id="resultsTable" style="display:none">
+    <!-- Results -->
+    <section id="reportRoot" class="bg-card border border-border rounded-xl2 p-4 shadow-soft">
+      <h2 class="text-lg font-semibold mb-2">Insights</h2>
+      <div id="emptyState" class="text-sm text-muted">No insights yet. Click <b>Analyze</b>.</div>
+      <div class="overflow-x-auto">
+        <table id="resultsTable" class="min-w-full hidden">
           <thead>
-            <tr><th>Competitor</th><th>Insight</th><th>Score</th><th>Note</th></tr>
+            <tr class="text-left text-[#c6d2e2]">
+              <th class="border-b border-border py-2 pr-3">Competitor</th>
+              <th class="border-b border-border py-2 pr-3">Insight</th>
+              <th class="border-b border-border py-2 pr-3">Score</th>
+              <th class="border-b border-border py-2">Note</th>
+            </tr>
           </thead>
           <tbody id="resultsBody"></tbody>
         </table>
-        <div id="emptyState" class="status">No insights yet. Click <b>Analyze</b>.</div>
       </div>
-    </div>
+    </section>
   </div>
 
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="./main.js"></script>
 </body>
 </html>
