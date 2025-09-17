@@ -1,4 +1,4 @@
-# main.py — Signal & Scale API (v2.5.1)
+# main.py — Signal & Scale API (v2.6.0)
 # Dependencies: fastapi, uvicorn[standard], httpx, pydantic
 
 import os, io, csv, json, sys
@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # -------------------- App --------------------
-app = FastAPI(title="Signal & Scale", version="2.5.1")
+app = FastAPI(title="Signal & Scale", version="2.6.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
@@ -28,7 +28,8 @@ async def log_requests(request: Request, call_next):
 # -------------------- Auth (your customers’ keys) --------------------
 def _load_keys(env_name: str) -> List[str]:
     raw = os.getenv(env_name, "").strip()
-    if not raw: return []
+    if not raw:
+        return []
     return [p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()]
 
 APP_API_KEYS = _load_keys("API_KEYS")  # e.g., "sk_live_demo,sk_client_A"
@@ -43,20 +44,23 @@ class Brand(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
-    class Config: extra = "ignore"
+    class Config:
+        extra = "ignore"
 
 class Competitor(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
-    class Config: extra = "ignore"
+    class Config:
+        extra = "ignore"
 
 class AnalyzeRequest(BaseModel):
     brand: Brand = Field(default_factory=Brand)
     competitors: List[Competitor] = Field(default_factory=list)
     mode: Optional[str] = "all"      # weekly_report | cultural_radar | peer_tracker | all
     window_days: Optional[int] = 7
-    class Config: extra = "ignore"
+    class Config:
+        extra = "ignore"
 
 # Clear 422s with body echo
 @app.exception_handler(RequestValidationError)
@@ -96,10 +100,13 @@ def _slug(s: Optional[str]) -> str:
 
 def infer_category(brand: Brand, comps: List[Competitor]) -> str:
     names = {_slug(brand.name)} | {_slug(c.name) for c in comps}
-    if names & ATHLETIC_KEYWORDS: return "athletic"
-    if names & STREETWEAR_KEYWORDS: return "streetwear"
+    if names & ATHLETIC_KEYWORDS:
+        return "athletic"
+    if names & STREETWEAR_KEYWORDS:
+        return "streetwear"
     url = _slug(brand.url)
-    if any(k in url for k in ["run","sport","athlet"]): return "athletic"
+    if any(k in url for k in ["run","sport","athlet"]):
+        return "athletic"
     return "apparel_lifestyle"
 
 def audience_archetypes(category: str) -> List[str]:
@@ -222,7 +229,8 @@ def synthesize_brand_strategy(brand: Brand, comps: List[Competitor], sections: D
     return signals
 
 def is_thin(rows: List[Dict[str, Any]]) -> bool:
-    if not rows: return True
+    if not rows:
+        return True
     meaningful = [r for r in rows if (r.get("signal") or "").strip().lower() not in ("", "no insights")]
     return len(meaningful) < THIN_MIN_SIGNALS
 
@@ -248,7 +256,7 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
         "competitors": [c.dict() for c in req.competitors],
         "mode": req.mode or "all",
         "window_days": req.window_days or 7,
-        "context": {"source":"signal-scale","version":"2.5.1"}
+        "context": {"source":"signal-scale","version":"2.6.0"}
     }
     headers = {"Authorization": f"Bearer {MANUS_API_KEY}", "Content-Type": "application/json"}
     url = f"{MANUS_BASE_URL}{MANUS_RUN_PATH}"
@@ -286,20 +294,20 @@ def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
         r.raise_for_status()
         data = r.json()
     text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content")) or "{}"
-    # Parse safely
     out: List[Dict[str, Any]] = []
     try:
         parsed = json.loads(text)
         for it in (parsed.get("insights") or []):
+            score_val = it.get("score", 0)
+            score = int(score_val) if isinstance(score_val, (int, float)) else 0
             out.append({
                 "brand": req.brand.name or "Unknown",
                 "competitor": it.get("competitor",""),
                 "signal": it.get("title",""),
-                "score": int(it.get("score", 0)) if isinstance(it.get("score", 0), (int,float)) else 0,
+                "score": score,
                 "note": f"source: openai | {it.get('note','')}"
             })
     except Exception:
-        # if the model returned non-JSON, produce a single generic but category-aware row
         out.append({
             "brand": req.brand.name or "Unknown",
             "competitor": "",
@@ -319,10 +327,12 @@ def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
         try:
             if p == "manus":
                 rows, sections = call_manus(req)
-                if rows: break
+                if rows:
+                    break
             elif p == "openai":
                 rows = call_openai(req)
-                if rows: break
+                if rows:
+                    break
         except Exception as e:
             errors.append(f"{p}: {type(e).__name__}: {str(e)[:200]}")
             continue
@@ -332,14 +342,15 @@ def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
         rows = fallback_rows(req.brand, req.competitors, note=note)
         sections = {"weekly_report":{}, "cultural_radar":{}, "peer_tracker":{}, "warnings":[note]}
 
-    # Always add small category-aware strategy set for differentiation
+    # Add small category-aware strategy set for differentiation
     strategy = synthesize_brand_strategy(req.brand, req.competitors, sections)[:12]
     # Deduplicate (competitor, signal)
     seen = set()
     final_rows: List[Dict[str, Any]] = []
     for r in rows + strategy:
         key = (_slug(r.get("competitor")), _slug(r.get("signal")))
-        if key in seen: continue
+        if key in seen:
+            continue
         seen.add(key)
         final_rows.append(r)
 
@@ -358,7 +369,7 @@ def health():
     return {
         "ok": True,
         "service": "signal-scale",
-        "version": "2.5.1",
+        "version": "2.6.0",
         "keys_enabled": bool(APP_API_KEYS),
         "manus_configured": bool(MANUS_API_KEY),
         "openai_configured": bool(OPENAI_API_KEY),
@@ -394,24 +405,29 @@ def export_csv(req: AnalyzeRequest, _=Depends(require_api_key)):
     buf = io.StringIO()
     fieldnames = ["brand","competitor","signal","score","note"]
     w = csv.DictWriter(buf, fieldnames=fieldnames); w.writeheader()
-    for r in rows: w.writerow({k: r.get(k,"") for k in fieldnames})
+    for r in rows:
+        w.writerow({k: r.get(k,"") for k in fieldnames})
     return StreamingResponse(
         io.BytesIO(buf.getvalue().encode("utf-8")),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename=\"signal_scale_export.csv\"'}
     )
 
-# -------------------- Frontend (serve / + /static) --------------------
+# -------------------- Frontend (serve / + assets) --------------------
 def find_web_dir() -> str:
+    # 1) explicit override
     override = os.getenv("WEB_DIR", "").strip()
     if override and os.path.exists(os.path.join(override, "index.html")):
         return override
+    # 2) common locations
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(base_dir, "web"),                 # src/api/web
-        os.path.join(base_dir, "..", "web"),           # src/web
-        os.path.join(base_dir, "..", "..", "web"),     # web at repo root
-        os.path.join(os.getcwd(), "web"),              # CWD/web
+        os.path.join(base_dir, "web"),                         # src/api/web
+        os.path.join(base_dir, "..", "web"),                   # src/web
+        os.path.join(base_dir, "..", "..", "web"),             # repo-root/web
+        os.path.join(base_dir, "..", "..", "frontend", "dist"),# repo-root/frontend/dist
+        os.path.join(os.getcwd(), "frontend", "dist"),         # CWD/frontend/dist
+        os.path.join(os.getcwd(), "web"),                      # CWD/web
     ]
     for c in map(os.path.abspath, candidates):
         if os.path.exists(os.path.join(c, "index.html")):
@@ -424,8 +440,11 @@ INDEX_HTML = os.path.join(WEB_DIR, "index.html")
 print(f"[startup] USING WEB_DIR={WEB_DIR} exists={os.path.isdir(WEB_DIR)}", flush=True)
 print(f"[startup] INDEX_HTML exists={os.path.exists(INDEX_HTML)}", flush=True)
 
-if os.path.isdir(WEB_DIR):
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+# Serve Vite assets (hashed files) and the full dist
+assets_dir = os.path.join(WEB_DIR, "assets")
+if os.path.isdir(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 @app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def root():
@@ -435,6 +454,7 @@ def root():
 
 @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def spa_fallback(full_path: str):
+    # Let real API paths 404 through
     if full_path.startswith("api"):
         raise HTTPException(status_code=404, detail="Not found")
     if not os.path.exists(INDEX_HTML):
