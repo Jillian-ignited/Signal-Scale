@@ -1,8 +1,5 @@
-# main.py — Signal & Scale API (v2.5.0)
-# - Dynamic brand intelligence via Manus (primary)
-# - Optional OpenAI fallback/enrichment
-# - SPA hosting for /web
-# Requirements: fastapi, uvicorn[standard], httpx, pydantic
+# main.py — Signal & Scale API (v2.5.1)
+# Dependencies: fastapi, uvicorn[standard], httpx, pydantic
 
 import os, io, csv, json, sys
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,10 +9,11 @@ from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # -------------------- App --------------------
-app = FastAPI(title="Signal & Scale", version="2.5.0")
+app = FastAPI(title="Signal & Scale", version="2.5.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
@@ -177,12 +175,12 @@ def normalize_from_manus(brand: Brand, comps: List[Competitor], raw: Dict[str, A
             "note": f"source: manus | section: cultural_radar | profile: {c.get('profile','')}"
         })
 
-    # Peer tracker: compare Crooks (or focal brand) vs peers by dimension
+    # Peer tracker: compare focal brand vs peers by dimension
     sc = (sections["peer_tracker"].get("scorecard") or {}).get("scores") or []
-    focal = [s for s in sc if (_slug(s.get("brand")) == _slug(brand.name))]
+    focal = [s for s in sc if _slug(s.get("brand")) == _slug(brand.name)]
     for c in comps[:8]:
         cname = c.name or ""
-        peer_rows = [s for s in sc if (_slug(s.get("brand")) == _slug(cname))]
+        peer_rows = [s for s in sc if _slug(s.get("brand")) == _slug(cname)]
         for dim in {"Homepage","PDP","Checkout","ContentCommunity","MobileUX","PricePresentation"}:
             cs = next((s for s in focal if s.get("dimension")==dim), None)
             ps = next((s for s in peer_rows if s.get("dimension")==dim), None)
@@ -212,7 +210,7 @@ def synthesize_brand_strategy(brand: Brand, comps: List[Competitor], sections: D
     for f in competitor_focus_points(cat):
         signals.append({"brand": brand.name or "Unknown", "competitor":"", "signal": f"Competitor focus area: {f}", "score":57, "note": f"category: {cat} | source: strategy"})
 
-    # If weekly_report has opportunities, surface top few as well
+    # Surface top Manus opportunities again as explicit actions
     for opp in (sections.get("weekly_report", {}).get("opportunities_risks") or [])[:5]:
         signals.append({
             "brand": brand.name or "Unknown",
@@ -250,7 +248,7 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
         "competitors": [c.dict() for c in req.competitors],
         "mode": req.mode or "all",
         "window_days": req.window_days or 7,
-        "context": {"source":"signal-scale","version":"2.5.0"}
+        "context": {"source":"signal-scale","version":"2.5.1"}
     }
     headers = {"Authorization": f"Bearer {MANUS_API_KEY}", "Content-Type": "application/json"}
     url = f"{MANUS_BASE_URL}{MANUS_RUN_PATH}"
@@ -264,26 +262,188 @@ def call_manus(req: AnalyzeRequest) -> Tuple[List[Dict[str, Any]], Dict[str, Any
     return rows, sections
 
 def call_openai(req: AnalyzeRequest) -> List[Dict[str, Any]]:
+    """Simple brand-differentiated fallback using OpenAI Chat Completions."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OpenAI not configured")
+    category = infer_category(req.brand, req.competitors)
     sys_msg = {
         "role": "system",
         "content": (
-            "You are a competitive intelligence analyst. Return JSON only: "
+            "You are a competitive intelligence analyst. Return STRICT JSON only with shape: "
             '{"insights":[{"competitor":"","title":"","score":0,"note":""}]}. '
-            "Differentiate outputs by brand category (athletic vs streetwear vs lifestyle)."
+            "Differentiate by brand category and competitor context. No markdown, no prose."
         )
     }
-    user_msg = {"role": "user", "content": json.dumps({"brand": req.brand.dict(), "competitors": [c.dict() for c in req.competitors]})}
+    user_payload = {
+        "brand": req.brand.dict(),
+        "competitors": [c.dict() for c in req.competitors],
+        "category_hint": category
+    }
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
-    body = {"model": OPENAI_MODEL, "messages": [sys_msg, user_msg], "temperature": 0.2}
+    body = {"model": OPENAI_MODEL, "messages": [sys_msg, {"role": "user", "content": json.dumps(user_payload)}], "temperature": 0.2}
     with httpx.Client(timeout=OPENAI_TIMEOUT_S) as client:
         r = client.post(OPENAI_CHAT_URL, headers=headers, json=body)
         r.raise_for_status()
         data = r.json()
-    text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content")) or json.dumps(data)
-    # Light parser
+    text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content")) or "{}"
+    # Parse safely
+    out: List[Dict[str, Any]] = []
     try:
         parsed = json.loads(text)
-        out: List[Dict[str, Any]] = []
-        for it in (parsed.get
+        for it in (parsed.get("insights") or []):
+            out.append({
+                "brand": req.brand.name or "Unknown",
+                "competitor": it.get("competitor",""),
+                "signal": it.get("title",""),
+                "score": int(it.get("score", 0)) if isinstance(it.get("score", 0), (int,float)) else 0,
+                "note": f"source: openai | {it.get('note','')}"
+            })
+    except Exception:
+        # if the model returned non-JSON, produce a single generic but category-aware row
+        out.append({
+            "brand": req.brand.name or "Unknown",
+            "competitor": "",
+            "signal": f"Category-driven next move ({category})",
+            "score": 55,
+            "note": "source: openai | parse_fallback"
+        })
+    return out
+
+# -------------------- Core --------------------
+def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
+    errors: List[str] = []
+    rows: List[Dict[str, Any]] = []
+    sections: Dict[str, Any] = {}
+
+    for p in PROVIDER_ORDER:
+        try:
+            if p == "manus":
+                rows, sections = call_manus(req)
+                if rows: break
+            elif p == "openai":
+                rows = call_openai(req)
+                if rows: break
+        except Exception as e:
+            errors.append(f"{p}: {type(e).__name__}: {str(e)[:200]}")
+            continue
+
+    if not rows:
+        note = " | ".join(errors) if errors else "no provider configured"
+        rows = fallback_rows(req.brand, req.competitors, note=note)
+        sections = {"weekly_report":{}, "cultural_radar":{}, "peer_tracker":{}, "warnings":[note]}
+
+    # Always add small category-aware strategy set for differentiation
+    strategy = synthesize_brand_strategy(req.brand, req.competitors, sections)[:12]
+    # Deduplicate (competitor, signal)
+    seen = set()
+    final_rows: List[Dict[str, Any]] = []
+    for r in rows + strategy:
+        key = (_slug(r.get("competitor")), _slug(r.get("signal")))
+        if key in seen: continue
+        seen.add(key)
+        final_rows.append(r)
+
+    return {
+        "ok": True,
+        "brand": req.brand.dict(),
+        "competitors_count": len(req.competitors),
+        "category_inferred": infer_category(req.brand, req.competitors),
+        "signals": final_rows,
+        "sections": sections
+    }
+
+# -------------------- API --------------------
+@app.get("/api/health")
+def health():
+    return {
+        "ok": True,
+        "service": "signal-scale",
+        "version": "2.5.1",
+        "keys_enabled": bool(APP_API_KEYS),
+        "manus_configured": bool(MANUS_API_KEY),
+        "openai_configured": bool(OPENAI_API_KEY),
+        "provider_order": PROVIDER_ORDER
+    }
+
+@app.get("/api/integrations/manus/check")
+def manus_check(_=Depends(require_api_key)):
+    return {
+        "configured": bool(MANUS_API_KEY),
+        "base_url_set": bool(MANUS_BASE_URL),
+        "agent_id_set": bool(MANUS_AGENT_ID),
+        "run_path": MANUS_RUN_PATH,
+        "timeout_s": MANUS_TIMEOUT_S
+    }
+
+@app.get("/api/integrations/openai/check")
+def openai_check(_=Depends(require_api_key)):
+    return {
+        "configured": bool(OPENAI_API_KEY),
+        "model": OPENAI_MODEL,
+        "chat_url": OPENAI_CHAT_URL
+    }
+
+@app.post("/api/intelligence/analyze")
+def analyze(req: AnalyzeRequest, _=Depends(require_api_key)):
+    return analyze_core(req)
+
+@app.post("/api/intelligence/export")
+def export_csv(req: AnalyzeRequest, _=Depends(require_api_key)):
+    result = analyze_core(req)
+    rows = result.get("signals", [])
+    buf = io.StringIO()
+    fieldnames = ["brand","competitor","signal","score","note"]
+    w = csv.DictWriter(buf, fieldnames=fieldnames); w.writeheader()
+    for r in rows: w.writerow({k: r.get(k,"") for k in fieldnames})
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename=\"signal_scale_export.csv\"'}
+    )
+
+# -------------------- Frontend (serve / + /static) --------------------
+def find_web_dir() -> str:
+    override = os.getenv("WEB_DIR", "").strip()
+    if override and os.path.exists(os.path.join(override, "index.html")):
+        return override
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, "web"),                 # src/api/web
+        os.path.join(base_dir, "..", "web"),           # src/web
+        os.path.join(base_dir, "..", "..", "web"),     # web at repo root
+        os.path.join(os.getcwd(), "web"),              # CWD/web
+    ]
+    for c in map(os.path.abspath, candidates):
+        if os.path.exists(os.path.join(c, "index.html")):
+            return c
+    return os.path.abspath(os.path.join(base_dir, "web"))
+
+WEB_DIR = find_web_dir()
+INDEX_HTML = os.path.join(WEB_DIR, "index.html")
+
+print(f"[startup] USING WEB_DIR={WEB_DIR} exists={os.path.isdir(WEB_DIR)}", flush=True)
+print(f"[startup] INDEX_HTML exists={os.path.exists(INDEX_HTML)}", flush=True)
+
+if os.path.isdir(WEB_DIR):
+    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def root():
+    if not os.path.exists(INDEX_HTML):
+        return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected: <code>{INDEX_HTML}</code></p>", status_code=500)
+    return FileResponse(INDEX_HTML)
+
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def spa_fallback(full_path: str):
+    if full_path.startswith("api"):
+        raise HTTPException(status_code=404, detail="Not found")
+    if not os.path.exists(INDEX_HTML):
+        return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected: <code>{INDEX_HTML}</code></p>", status_code=500)
+    return FileResponse(INDEX_HTML)
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"])
+def favicon():
+    ico_path = os.path.join(WEB_DIR, "favicon.ico")
+    if os.path.exists(ico_path):
+        return FileResponse(ico_path)
+    return HTMLResponse("", status_code=204)
