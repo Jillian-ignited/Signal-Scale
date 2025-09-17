@@ -1,555 +1,92 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signal & Scale - Brand Intelligence Platform</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <style>
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .tab-button.active { background-color: #fef3c7; color: #92400e; }
-        .progress-bar { transition: width 0.3s ease; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-    </style>
+  <meta charset="utf-8" />
+  <title>Signal & Scale</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0b0c10; --card:#151720; --text:#e9eef3; --muted:#9aa6b2; --accent:#5ec17a; }
+    html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { max-width:1100px; margin:40px auto; padding:0 16px; }
+    h1 { margin:0 0 12px; font-size:24px; }
+    .muted { color:var(--muted); }
+    .grid { display:grid; gap:16px; grid-template-columns:1fr 1fr; align-items:start; }
+    .card { background:var(--card); border-radius:14px; padding:16px; box-shadow:0 1px 0 #000 inset, 0 2px 16px rgba(0,0,0,.25); }
+    label { display:block; font-weight:600; margin:12px 0 6px; }
+    input, textarea { width:100%; background:#0f1117; color:var(--text); border:1px solid #222936; border-radius:10px; padding:10px 12px; outline:none; }
+    textarea { min-height:120px; resize:vertical; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    button { background:var(--accent); color:#07140b; font-weight:700; border:none; border-radius:10px; padding:10px 14px; cursor:pointer; }
+    button.secondary { background:#2e3647; color:var(--text); }
+    .pill { background:#1b2030; color:var(--muted); padding:6px 8px; border-radius:999px; font-size:12px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { border-bottom:1px solid #232a38; text-align:left; padding:8px; vertical-align:top; }
+    th { color:#b7c4d3; font-weight:600; }
+    .status { margin-top:8px; font-size:12px; color:var(--muted); }
+    .footer { margin-top:14px; font-size:12px; color:var(--muted); }
+    .ok { color:#7bd489; } .err { color:#ff8a8a; }
+    @media (max-width: 900px) { .grid { grid-template-columns:1fr; } }
+  </style>
 </head>
-<body class="bg-stone-50 min-h-screen">
-    <!-- Header -->
-    <header class="bg-white border-b border-stone-200 px-6 py-4">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center">
-                    <i data-lucide="target" class="w-5 h-5 text-white"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-semibold text-stone-900">Signal & Scale</h1>
-                    <p class="text-sm text-stone-600">Brand Intelligence Platform</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-4">
-                <span class="px-3 py-1 bg-amber-100 text-amber-800 text-sm rounded-full">Professional Plan</span>
-                <button id="newAnalysisBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
-                    <i data-lucide="plus" class="w-4 h-4"></i>
-                    <span>New Analysis</span>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-6 py-8">
-        <!-- Setup Form -->
-        <div id="setupForm" class="bg-white rounded-xl shadow-sm border border-stone-200 p-8 mb-8">
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-stone-900 mb-2">Brand Intelligence Analysis</h2>
-                <p class="text-stone-600">Enter your brand details to generate comprehensive competitive intelligence</p>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-2">Brand Name *</label>
-                    <input id="brandName" type="text" placeholder="e.g., Supreme, Nike, Off-White" 
-                           class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-2">Brand Website</label>
-                    <input id="brandWebsite" type="url" placeholder="https://yourbrand.com" 
-                           class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                </div>
-            </div>
-            
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-stone-700 mb-2">Competitors (up to 5)</label>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <input id="competitor1" type="text" placeholder="Competitor 1" class="px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                    <input id="competitor2" type="text" placeholder="Competitor 2" class="px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                    <input id="competitor3" type="text" placeholder="Competitor 3" class="px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-2">Analysis Type</label>
-                    <select id="analysisType" class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                        <option value="complete">Complete Analysis</option>
-                        <option value="weekly">Weekly Report</option>
-                        <option value="cultural">Cultural Radar</option>
-                        <option value="peer">Peer Tracker</option>
-                    </select>
-                </div>
-            </div>
-            
-            <button id="startAnalysisBtn" class="w-full bg-stone-900 hover:bg-stone-800 text-white py-4 px-6 rounded-lg font-medium text-lg transition-colors">
-                <i data-lucide="play" class="w-5 h-5 mr-2 inline"></i>
-                Start Analysis
-            </button>
+<body>
+  <div class="wrap">
+    <h1>Signal & Scale <span class="pill" id="healthPill">checking…</span></h1>
+    <div class="grid">
+      <!-- Left: inputs -->
+      <div class="card">
+        <div class="row">
+          <label style="margin:0">App Key</label>
+          <input id="apiKey" placeholder="Optional: X-API-Key if your server requires it" />
+          <button class="secondary" id="saveKeyBtn">Save</button>
         </div>
 
-        <!-- Progress Bar -->
-        <div id="progressContainer" class="bg-white rounded-xl shadow-sm border border-stone-200 p-6 mb-8 hidden">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-stone-900">Analyzing Brand Intelligence</h3>
-                <span id="progressText" class="text-sm text-stone-600">0%</span>
-            </div>
-            <div class="w-full bg-stone-200 rounded-full h-3">
-                <div id="progressFill" class="bg-amber-500 h-3 rounded-full progress-bar" style="width: 0%"></div>
-            </div>
-            <p id="progressStatus" class="text-sm text-stone-600 mt-2">Initializing analysis...</p>
+        <label>Brand</label>
+        <div class="row">
+          <input id="brandName" placeholder="e.g., Crooks & Castles" />
+          <input id="brandUrl" placeholder="Brand URL (optional)" />
         </div>
 
-        <!-- Results Dashboard -->
-        <div id="resultsContainer" class="hidden">
-            <!-- Header with Key Metrics -->
-            <div class="bg-white rounded-xl shadow-sm border border-stone-200 p-6 mb-8">
-                <div class="flex items-center justify-between mb-6">
-                    <div>
-                        <h2 id="reportTitle" class="text-2xl font-bold text-stone-900">Brand Intelligence Report</h2>
-                        <p id="reportDate" class="text-stone-600">Generated today</p>
-                    </div>
-                    <div class="flex space-x-8">
-                        <div class="text-center">
-                            <div id="activeCreators" class="text-3xl font-bold text-stone-900">0</div>
-                            <div class="text-sm text-stone-600">Active Creators</div>
-                        </div>
-                        <div class="text-center">
-                            <div id="avgInfluenceScore" class="text-3xl font-bold text-stone-900">N/A</div>
-                            <div class="text-sm text-stone-600">Avg Influence Score</div>
-                        </div>
-                        <div class="text-center">
-                            <div id="competitiveScore" class="text-3xl font-bold text-stone-900">N/A</div>
-                            <div class="text-sm text-stone-600">Competitive Score</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="dataQuality" class="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div class="flex items-center">
-                        <i data-lucide="check-circle" class="w-5 h-5 text-green-600 mr-2"></i>
-                        <span class="text-green-800 font-medium">Verified Data Quality: <span id="confidenceScore">0%</span> confidence</span>
-                    </div>
-                </div>
-            </div>
+        <label>Competitors (one per line, optional URL after a pipe)</label>
+        <textarea id="competitors" placeholder="Stussy | https://www.stussy.com
+HUF | https://hufworldwide.com"></textarea>
 
-            <!-- Tab Navigation -->
-            <div class="bg-white rounded-xl shadow-sm border border-stone-200 mb-8">
-                <div class="border-b border-stone-200 px-6">
-                    <nav class="flex space-x-8">
-                        <button class="tab-button py-4 px-2 border-b-2 border-transparent text-stone-600 hover:text-stone-900 hover:border-stone-300 active" data-tab="overview">
-                            Overview
-                        </button>
-                        <button class="tab-button py-4 px-2 border-b-2 border-transparent text-stone-600 hover:text-stone-900 hover:border-stone-300" data-tab="cultural">
-                            Cultural Radar
-                        </button>
-                        <button class="tab-button py-4 px-2 border-b-2 border-transparent text-stone-600 hover:text-stone-900 hover:border-stone-300" data-tab="peer">
-                            Peer Tracker
-                        </button>
-                        <button class="tab-button py-4 px-2 border-b-2 border-transparent text-stone-600 hover:text-stone-900 hover:border-stone-300" data-tab="insights">
-                            Insights
-                        </button>
-                    </nav>
-                </div>
+        <label>Paste a report (optional)</label>
+        <textarea id="reportText" placeholder="Paste a weekly report or notes here to guide analysis"></textarea>
 
-                <!-- Tab Content -->
-                <div class="p-6">
-                    <!-- Overview Tab -->
-                    <div id="overview" class="tab-content active">
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <div>
-                                <h3 class="text-lg font-semibold text-stone-900 mb-4">Customer Sentiment</h3>
-                                <div class="space-y-4">
-                                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                        <div class="flex items-center justify-between">
-                                            <span class="font-medium text-green-800">Positive</span>
-                                            <span id="sentimentScore" class="text-green-600">0%</span>
-                                        </div>
-                                        <div id="positiveThemes" class="text-sm text-green-700 mt-2">Loading themes...</div>
-                                    </div>
-                                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                                        <div class="flex items-center justify-between">
-                                            <span class="font-medium text-red-800">Areas for Improvement</span>
-                                            <span id="negativeScore" class="text-red-600">0%</span>
-                                        </div>
-                                        <div id="negativeThemes" class="text-sm text-red-700 mt-2">Loading areas...</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-semibold text-stone-900 mb-4">Data Sources</h3>
-                                <div id="dataSources" class="space-y-2">
-                                    <div class="text-sm text-stone-600">Loading data sources...</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Cultural Radar Tab -->
-                    <div id="cultural" class="tab-content">
-                        <h3 class="text-lg font-semibold text-stone-900 mb-6">Verified Creator Network</h3>
-                        <div id="creatorGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div class="text-center text-stone-600 py-8">Loading verified creators...</div>
-                        </div>
-                    </div>
-
-                    <!-- Peer Tracker Tab -->
-                    <div id="peer" class="tab-content">
-                        <h3 class="text-lg font-semibold text-stone-900 mb-6">Competitive Analysis</h3>
-                        <div id="competitiveAnalysis" class="space-y-6">
-                            <div class="text-center text-stone-600 py-8">Loading competitive intelligence...</div>
-                        </div>
-                    </div>
-
-                    <!-- Insights Tab -->
-                    <div id="insights" class="tab-content">
-                        <h3 class="text-lg font-semibold text-stone-900 mb-6">Strategic Insights</h3>
-                        <div id="strategicInsights" class="space-y-6">
-                            <div class="text-center text-stone-600 py-8">Loading strategic recommendations...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="row" style="margin-top:10px">
+          <button id="analyzeBtn">Analyze</button>
+          <button id="exportBtn" class="secondary">Export CSV</button>
+          <span id="status" class="status"></span>
         </div>
-    </main>
+      </div>
 
-    <script>
-        // Global variables
-        let currentAnalysisData = null;
+      <!-- Right: results -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div class="muted">Summary</div>
+            <div id="summary">—</div>
+          </div>
+          <div class="muted" id="category">category: —</div>
+        </div>
 
-        // Initialize Lucide icons
-        lucide.createIcons();
+        <div style="margin-top:12px">
+          <table id="resultsTable" style="display:none">
+            <thead>
+              <tr><th>Competitor</th><th>Insight</th><th>Score</th><th>Note</th></tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+          <div id="emptyState" class="muted">No insights yet. Click <b>Analyze</b>.</div>
+        </div>
+      </div>
+    </div>
 
-        // Tab functionality
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', () => {
-                const tabId = button.getAttribute('data-tab');
-                
-                // Update active tab button
-                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                
-                // Update active tab content
-                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                document.getElementById(tabId).classList.add('active');
-            });
-        });
+    <div class="footer">
+      <span id="footerHealth"></span>
+    </div>
+  </div>
 
-        // New Analysis button
-        document.getElementById('newAnalysisBtn').addEventListener('click', () => {
-            document.getElementById('setupForm').style.display = 'block';
-            document.getElementById('resultsContainer').classList.add('hidden');
-            document.getElementById('progressContainer').classList.add('hidden');
-            
-            // Clear form
-            document.getElementById('brandName').value = '';
-            document.getElementById('brandWebsite').value = '';
-            document.getElementById('competitor1').value = '';
-            document.getElementById('competitor2').value = '';
-            document.getElementById('competitor3').value = '';
-        });
-
-        // Start Analysis button
-        document.getElementById('startAnalysisBtn').addEventListener('click', async () => {
-            const brandName = document.getElementById('brandName').value.trim();
-            
-            if (!brandName) {
-                alert('Please enter a brand name');
-                return;
-            }
-
-            // Hide form and show progress
-            document.getElementById('setupForm').style.display = 'none';
-            document.getElementById('progressContainer').classList.remove('hidden');
-            
-            // Prepare request data
-            const requestData = {
-                brand: {
-                    name: brandName,
-                    website: document.getElementById('brandWebsite').value.trim()
-                },
-                competitors: [
-                    { name: document.getElementById('competitor1').value.trim() },
-                    { name: document.getElementById('competitor2').value.trim() },
-                    { name: document.getElementById('competitor3').value.trim() }
-                ].filter(comp => comp.name),
-                analysis_type: document.getElementById('analysisType').value
-            };
-
-            try {
-                // Start progress animation
-                animateProgress();
-                
-                // Call API
-                const response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                currentAnalysisData = data;
-                
-                // Hide progress and show results
-                setTimeout(() => {
-                    document.getElementById('progressContainer').classList.add('hidden');
-                    displayResults(data);
-                }, 1000);
-
-            } catch (error) {
-                console.error('Analysis failed:', error);
-                document.getElementById('progressStatus').textContent = 'Analysis failed. Please try again.';
-                document.getElementById('progressStatus').className = 'text-sm text-red-600 mt-2';
-            }
-        });
-
-        function animateProgress() {
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            const progressStatus = document.getElementById('progressStatus');
-            
-            let progress = 0;
-            const statuses = [
-                'Initializing analysis...',
-                'Analyzing brand DNA...',
-                'Discovering influencers...',
-                'Analyzing sentiment...',
-                'Evaluating competitive landscape...',
-                'Generating insights...',
-                'Finalizing report...'
-            ];
-            
-            const interval = setInterval(() => {
-                progress += Math.random() * 15;
-                if (progress > 95) progress = 95;
-                
-                progressFill.style.width = progress + '%';
-                progressText.textContent = Math.round(progress) + '%';
-                
-                const statusIndex = Math.floor((progress / 100) * statuses.length);
-                if (statusIndex < statuses.length) {
-                    progressStatus.textContent = statuses[statusIndex];
-                }
-                
-                if (progress >= 95) {
-                    clearInterval(interval);
-                    progressFill.style.width = '100%';
-                    progressText.textContent = '100%';
-                    progressStatus.textContent = 'Analysis complete!';
-                }
-            }, 300);
-        }
-
-        function displayResults(data) {
-            // Update report header
-            document.getElementById('reportTitle').textContent = `${data.brand_analysis.brand_name} Intelligence Report`;
-            document.getElementById('reportDate').textContent = `Generated ${new Date().toLocaleDateString()}`;
-            
-            // Update key metrics
-            document.getElementById('activeCreators').textContent = data.overview.active_creators || 0;
-            document.getElementById('avgInfluenceScore').textContent = data.overview.avg_influence_score || 'N/A';
-            document.getElementById('competitiveScore').textContent = data.overview.competitive_score || 'N/A';
-            document.getElementById('confidenceScore').textContent = `${data.data_sources.confidence_score || 0}%`;
-            
-            // Update sentiment data
-            document.getElementById('sentimentScore').textContent = `${data.overview.sentiment_score || 0}%`;
-            document.getElementById('positiveThemes').textContent = data.overview.key_themes ? data.overview.key_themes.join(', ') : 'No themes available';
-            document.getElementById('negativeThemes').textContent = 'Loading improvement areas...';
-            
-            // Update data sources
-            const dataSourcesContainer = document.getElementById('dataSources');
-            dataSourcesContainer.innerHTML = `
-                <div class="text-sm text-stone-600">
-                    <div class="flex items-center mb-2">
-                        <i data-lucide="database" class="w-4 h-4 mr-2"></i>
-                        <span>Methodology: ${data.data_sources.analysis_methodology}</span>
-                    </div>
-                    <div class="flex items-center mb-2">
-                        <i data-lucide="clock" class="w-4 h-4 mr-2"></i>
-                        <span>Collected: ${new Date(data.data_sources.data_collection_timestamp).toLocaleString()}</span>
-                    </div>
-                    <div class="flex items-center">
-                        <i data-lucide="shield-check" class="w-4 h-4 mr-2"></i>
-                        <span>${data.data_sources.verification_status}</span>
-                    </div>
-                </div>
-            `;
-            
-            // Update creators
-            displayCreators(data.cultural_radar.creators || []);
-            
-            // Update competitive analysis
-            displayCompetitiveAnalysis(data.peer_tracker || {});
-            
-            // Update insights
-            displayInsights(data.insights || {});
-            
-            // Show results
-            document.getElementById('resultsContainer').classList.remove('hidden');
-            
-            // Recreate icons
-            lucide.createIcons();
-        }
-
-        function displayCreators(creators) {
-            const creatorGrid = document.getElementById('creatorGrid');
-            
-            if (!creators || creators.length === 0) {
-                creatorGrid.innerHTML = '<div class="text-center text-stone-600 py-8">No verified creators found</div>';
-                return;
-            }
-            
-            creatorGrid.innerHTML = creators.map(creator => `
-                <div class="bg-white border border-stone-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
-                                ${creator.name.charAt(0)}
-                            </div>
-                            <div>
-                                <h4 class="font-semibold text-stone-900">${creator.name}</h4>
-                                <p class="text-sm text-stone-600">${creator.handle}</p>
-                            </div>
-                        </div>
-                        ${creator.verification_status === 'Verified' ? '<i data-lucide="badge-check" class="w-5 h-5 text-blue-500"></i>' : ''}
-                    </div>
-                    
-                    <div class="space-y-3">
-                        <div class="flex justify-between text-sm">
-                            <span class="text-stone-600">Platform</span>
-                            <span class="font-medium">${creator.platform}</span>
-                        </div>
-                        <div class="flex justify-between text-sm">
-                            <span class="text-stone-600">Followers</span>
-                            <span class="font-medium">${creator.followers.toLocaleString()}</span>
-                        </div>
-                        <div class="flex justify-between text-sm">
-                            <span class="text-stone-600">Engagement</span>
-                            <span class="font-medium">${creator.engagement_rate}%</span>
-                        </div>
-                        <div class="flex justify-between text-sm">
-                            <span class="text-stone-600">Brand Affinity</span>
-                            <span class="font-medium">${creator.brand_affinity}/100</span>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4 pt-4 border-t border-stone-200">
-                        <p class="text-sm text-stone-600 mb-3">${creator.content_style}</p>
-                        <div class="flex space-x-2">
-                            <button class="flex-1 bg-stone-900 text-white py-2 px-3 rounded text-sm hover:bg-stone-800">
-                                View Profile
-                            </button>
-                            <button class="flex-1 border border-stone-300 text-stone-700 py-2 px-3 rounded text-sm hover:bg-stone-50">
-                                Contact
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function displayCompetitiveAnalysis(peerData) {
-            const competitiveContainer = document.getElementById('competitiveAnalysis');
-            
-            competitiveContainer.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div>
-                        <h4 class="font-semibold text-stone-900 mb-4">Market Position</h4>
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                            <div class="flex items-center justify-between">
-                                <span class="font-medium text-green-800">${peerData.competitive_position || 'Unknown'}</span>
-                                <span class="text-green-600">${peerData.market_share || 'N/A'}</span>
-                            </div>
-                        </div>
-                        
-                        <h4 class="font-semibold text-stone-900 mb-4">Competitive Advantages</h4>
-                        <div class="space-y-2">
-                            ${(peerData.competitive_advantages || []).map(advantage => `
-                                <div class="flex items-center space-x-2">
-                                    <i data-lucide="check" class="w-4 h-4 text-green-600"></i>
-                                    <span class="text-sm text-stone-700">${advantage}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h4 class="font-semibold text-stone-900 mb-4">Growth Opportunities</h4>
-                        <div class="space-y-3">
-                            ${(peerData.growth_opportunities || []).map(opportunity => `
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                    <div class="flex items-center space-x-2">
-                                        <i data-lucide="trending-up" class="w-4 h-4 text-blue-600"></i>
-                                        <span class="text-sm font-medium text-blue-800">${opportunity}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        
-                        <h4 class="font-semibold text-stone-900 mb-4 mt-6">Competitive Threats</h4>
-                        <div class="space-y-2">
-                            ${(peerData.competitive_threats || []).map(threat => `
-                                <div class="flex items-center space-x-2">
-                                    <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
-                                    <span class="text-sm text-stone-700">${threat}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function displayInsights(insightsData) {
-            const insightsContainer = document.getElementById('strategicInsights');
-            
-            insightsContainer.innerHTML = `
-                <div class="space-y-8">
-                    <div>
-                        <h4 class="font-semibold text-stone-900 mb-4">Priority Actions</h4>
-                        <div class="space-y-4">
-                            ${(insightsData.priority_actions || []).map(action => `
-                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                    <div class="flex items-start justify-between mb-2">
-                                        <h5 class="font-medium text-amber-900">${action.category}</h5>
-                                        <span class="px-2 py-1 bg-amber-200 text-amber-800 text-xs rounded-full">${action.priority}</span>
-                                    </div>
-                                    <p class="text-sm text-amber-800 mb-2">${action.recommendation}</p>
-                                    <div class="text-xs text-amber-700">
-                                        <div class="mb-1"><strong>Timeline:</strong> ${action.timeline}</div>
-                                        <div><strong>Expected Impact:</strong> ${action.expected_impact}</div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h4 class="font-semibold text-stone-900 mb-4">Differentiation Opportunities</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            ${(insightsData.differentiation_opportunities || []).map(opp => `
-                                <div class="bg-white border border-stone-200 rounded-lg p-4">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <h5 class="font-medium text-stone-900">${opp.opportunity}</h5>
-                                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">${opp.impact} Impact</span>
-                                    </div>
-                                    <p class="text-sm text-stone-600 mb-2">${opp.description}</p>
-                                    <div class="text-xs text-stone-500">
-                                        <div class="mb-1"><strong>Effort:</strong> ${opp.effort}</div>
-                                        <div><strong>Timeline:</strong> ${opp.timeline}</div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-    </script>
+  <script src="./main.js"></script>
 </body>
 </html>
