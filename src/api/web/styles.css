@@ -1,0 +1,92 @@
+:root{
+  --bg:#0c0f14; --bg2:#0b0d12;
+  --ink:#e9eff7; --muted:#a1afc0;
+  --line:#1f2633; --card:#121622; --panel:#0f1320;
+  --accent:#76e0b1; --accent-ink:#0a2216; --pill:#1b2334;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; color:var(--ink);
+  background: radial-gradient(900px 600px at 60% -10%, #18243a 0, transparent 60%), linear-gradient(180deg,var(--bg),var(--bg2));
+  font:15px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Inter, Roboto, sans-serif;
+}
+
+/* Layout */
+.sidebar{
+  position:fixed; inset:0 auto 0 0; width:240px; padding:20px 16px;
+  background:var(--panel); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; gap:18px;
+}
+.logo{font-weight:800; letter-spacing:.3px; font-size:20px}
+.logo span{color:var(--accent)}
+.nav{display:block; width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#111427; color:var(--ink); cursor:pointer}
+.nav.active{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+.foot{margin-top:auto}
+.pill{display:inline-block; padding:6px 10px; border-radius:999px; background:#1c2538; color:#c7d3e2; font-size:12px}
+
+.main{margin-left:240px; padding:22px 24px}
+.topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px}
+.title h1{margin:0; font-size:22px}
+.sub{margin:6px 0 0; color:var(--muted)}
+.actions{display:flex; gap:10px}
+
+/* Cards / controls */
+.grid{display:grid; grid-template-columns:1.1fr .9fr; gap:16px}
+.card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.section-title{font-weight:700; letter-spacing:.2px; margin-bottom:10px}
+.input{width:100%; background:#0d1222; color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
+.area{min-height:110px; resize:vertical}
+.row{display:flex; align-items:center}
+.gap{gap:8px}
+.status{font-size:12px; color:var(--muted)}
+
+.kvs{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:2px}
+.kv{background:#0f1526; border:1px solid var(--line); border-radius:12px; padding:10px}
+.kv-label{color:#a8b6c9; font-size:12px}
+.kv-value{font-size:15px; font-weight:700; margin-top:4px}
+
+.chart-block{margin-top:14px; background:#0f1526; border:1px solid var(--line); border-radius:12px; padding:10px}
+
+/* Buttons */
+.btn{background:#1a2135; color:var(--ink); border:1px solid var(--line); padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:700}
+.btn.accent{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+
+/* Table */
+.table-wrap{overflow:auto; margin-top:8px}
+.table{width:100%; border-collapse:collapse}
+.table th,.table td{border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; vertical-align:top}
+.table th{color:#c9d6e8; font-weight:700}
+.hide{display:none}
+.empty{color:var(--muted); padding:12px 0}
+
+/* Pages */
+.page{display:none}
+.page.active{display:block}
+
+/* Report */
+.report .report-head{display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:12px}
+.report h2{margin:0}
+.badge{background:var(--accent); color:var(--accent-ink); padding:6px 10px; border-radius:999px; font-weight:700}
+.report-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.block{background:#0f1526; border:1px solid var(--line); border-radius:12px; padding:12px}
+.block h3{margin:0 0 8px 0}
+.block.span2{grid-column:1 / span 2}
+.list{margin:0; padding-left:18px}
+.detail .row{display:grid; grid-template-columns:180px 1fr 60px; gap:8px; padding:8px 0; border-bottom:1px solid var(--line)}
+.detail .row:last-child{border-bottom:none}
+.detail .tag{font-weight:700; color:#c9d6e8}
+.muted{color:var(--muted)}
+.report-foot{display:flex; justify-content:space-between; margin-top:12px; padding-top:10px; border-top:1px solid var(--line)}
+
+/* Print */
+@media print{
+  body{background:#fff; color:#111; font:12px/1.4 system-ui,-apple-system,Segoe UI,Inter,Roboto,sans-serif}
+  .sidebar,.topbar,.btn{display:none!important}
+  .main{margin:0; padding:0}
+  .card{background:#fff; border:none; box-shadow:none}
+  .report .block{background:#fff; border:1px solid #e5e7eb}
+  .table th,.table td{border:1px solid #e5e7eb; color:#111}
+}
+@media (max-width: 1100px){ .grid{grid-template-columns:1fr} .kvs{grid-template-columns:repeat(2,1fr)} }
