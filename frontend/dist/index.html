@@ -5,85 +5,86 @@
   <title>Signal & Scale</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root { --bg:#0b0c10; --card:#151720; --text:#e9eef3; --muted:#9aa6b2; --accent:#5ec17a; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .wrap { max-width:1100px; margin:40px auto; padding:0 16px; }
-    h1 { margin:0 0 12px; font-size:24px; }
-    .muted { color:var(--muted); }
-    .grid { display:grid; gap:16px; grid-template-columns:1fr 1fr; align-items:start; }
-    .card { background:var(--card); border-radius:14px; padding:16px; box-shadow:0 1px 0 #000 inset, 0 2px 16px rgba(0,0,0,.25); }
-    label { display:block; font-weight:600; margin:12px 0 6px; }
-    input, textarea { width:100%; background:#0f1117; color:var(--text); border:1px solid #222936; border-radius:10px; padding:10px 12px; outline:none; }
-    textarea { min-height:120px; resize:vertical; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    button { background:var(--accent); color:#07140b; font-weight:700; border:none; border-radius:10px; padding:10px 14px; cursor:pointer; }
-    button.secondary { background:#2e3647; color:var(--text); }
-    .pill { background:#1b2030; color:var(--muted); padding:6px 8px; border-radius:999px; font-size:12px; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; }
-    th, td { border-bottom:1px solid #232a38; text-align:left; padding:8px; vertical-align:top; }
-    th { color:#b7c4d3; font-weight:600; }
-    .status { margin-top:8px; font-size:12px; color:var(--muted); }
-    .footer { margin-top:14px; font-size:12px; color:var(--muted); }
-    .ok { color:#7bd489; } .err { color:#ff8a8a; }
-    @media (max-width: 900px) { .grid { grid-template-columns:1fr; } }
+    :root { --bg:#0b0c10; --panel:#12141c; --card:#171a24; --text:#e8eef5; --muted:#95a3b1; --accent:#67d39b; --border:#252b39;}
+    * { box-sizing:border-box }
+    body { margin:0; background:linear-gradient(180deg,#0b0c10,#0c1018); color:var(--text); font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; }
+    .wrap { max-width:1100px; margin:36px auto; padding:0 16px; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    h1 { margin:0; font-size:22px; letter-spacing:.2px }
+    .pill { padding:6px 10px; border-radius:999px; background:#1b2030; color:#b9c6d6; font-size:12px }
+    .ok { color:#7bd489 } .err { color:#ff8a8a }
+    .grid { display:grid; grid-template-columns:1fr 1.1fr; gap:16px }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.25) }
+    label { display:block; font-weight:600; margin:10px 0 6px; color:#c8d6e6 }
+    input, textarea { width:100%; background:#0f1219; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px; outline:none }
+    textarea { min-height:120px; resize:vertical }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+    button { background:var(--accent); color:#05210e; font-weight:700; border:none; border-radius:10px; padding:10px 14px; cursor:pointer }
+    button.secondary { background:#2a3142; color:var(--text) }
+    .status { font-size:12px; color:var(--muted); margin-left:10px }
+    table { width:100%; border-collapse:collapse; margin-top:10px }
+    th, td { border-bottom:1px solid var(--border); padding:10px 8px; text-align:left; vertical-align:top }
+    th { color:#c6d2e2; font-weight:700 }
+    .summary { display:flex; align-items:center; justify-content:space-between; color:var(--muted) }
+    .kvs { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px }
+    .kv { background:#111520; padding:6px 8px; border:1px solid var(--border); border-radius:8px; font-size:12px }
+    @media (max-width: 900px) { .grid { grid-template-columns:1fr } }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Signal & Scale <span class="pill" id="healthPill">checking…</span></h1>
+    <header>
+      <h1>Signal & Scale</h1>
+      <span class="pill" id="healthPill">checking…</span>
+    </header>
+
     <div class="grid">
-      <!-- Left: inputs -->
       <div class="card">
         <div class="row">
-          <label style="margin:0">App Key</label>
-          <input id="apiKey" placeholder="Optional: X-API-Key if your server requires it" />
-          <button class="secondary" id="saveKeyBtn">Save</button>
+          <input id="apiKey" placeholder="App Key (optional if server requires X-API-Key)" />
+          <button class="secondary" id="saveKeyBtn">Save Key</button>
+          <span id="status" class="status"></span>
         </div>
 
         <label>Brand</label>
         <div class="row">
           <input id="brandName" placeholder="e.g., Crooks & Castles" />
-          <input id="brandUrl" placeholder="Brand URL (optional)" />
+          <input id="brandUrl" placeholder="Brand URL (optional, e.g., https://crooksncastles.com)" />
         </div>
 
-        <label>Competitors (one per line, optional URL after a pipe)</label>
+        <label>Competitors (one per line, use optional URL after a pipe)</label>
         <textarea id="competitors" placeholder="Stussy | https://www.stussy.com
 HUF | https://hufworldwide.com"></textarea>
 
-        <label>Paste a report (optional)</label>
-        <textarea id="reportText" placeholder="Paste a weekly report or notes here to guide analysis"></textarea>
+        <label>Paste report (optional)</label>
+        <textarea id="reportText" placeholder="Paste any weekly notes/report to guide analysis"></textarea>
 
         <div class="row" style="margin-top:10px">
           <button id="analyzeBtn">Analyze</button>
           <button id="exportBtn" class="secondary">Export CSV</button>
-          <span id="status" class="status"></span>
         </div>
       </div>
 
-      <!-- Right: results -->
       <div class="card">
-        <div class="row" style="justify-content:space-between">
+        <div class="summary">
           <div>
-            <div class="muted">Summary</div>
-            <div id="summary">—</div>
+            <div id="summaryBrand">—</div>
+            <div class="kvs">
+              <div class="kv" id="kvCategory">category: —</div>
+              <div class="kv" id="kvCount">insights: 0</div>
+              <div class="kv" id="kvData">data: —</div>
+            </div>
           </div>
-          <div class="muted" id="category">category: —</div>
         </div>
 
-        <div style="margin-top:12px">
-          <table id="resultsTable" style="display:none">
-            <thead>
-              <tr><th>Competitor</th><th>Insight</th><th>Score</th><th>Note</th></tr>
-            </thead>
-            <tbody id="resultsBody"></tbody>
-          </table>
-          <div id="emptyState" class="muted">No insights yet. Click <b>Analyze</b>.</div>
-        </div>
+        <table id="resultsTable" style="display:none">
+          <thead>
+            <tr><th>Competitor</th><th>Insight</th><th>Score</th><th>Note</th></tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+        <div id="emptyState" class="status">No insights yet. Click <b>Analyze</b>.</div>
       </div>
-    </div>
-
-    <div class="footer">
-      <span id="footerHealth"></span>
     </div>
   </div>
 
