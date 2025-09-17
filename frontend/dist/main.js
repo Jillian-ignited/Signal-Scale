@@ -4,7 +4,9 @@ const resultBody = qs('#resultsBody');
 const emptyState = qs('#emptyState');
 const statusEl = qs('#status');
 const apiKeyInput = qs('#apiKey');
+let chart;
 
+// Persist API key
 (function initKey() {
   const saved = localStorage.getItem('ss_api_key') || '';
   apiKeyInput.value = saved;
@@ -14,22 +16,23 @@ const apiKeyInput = qs('#apiKey');
   });
 })();
 
+// Health check
 (async function health() {
   try {
     const r = await fetch('/api/health');
     const j = await r.json();
-    qs('#healthPill').textContent = j.ok ? 'healthy' : 'check config';
-    qs('#healthPill').style.background = j.ok ? '#253b2e' : '#3b2525';
-    qs('#kvData').textContent = `data: probes:${j.probes ? 'on' : 'off'} psi:${j.pagespeed ? 'on' : 'off'} yt:${j.youtube ? 'on' : 'off'}`;
+    const pill = qs('#healthPill');
+    pill.textContent = j.ok ? 'healthy' : 'check config';
+    pill.classList.toggle('bg-[#253b2e]', j.ok);
+    qs('#kvData').textContent = `data: probes:${j.probes?'on':'off'} psi:${j.pagespeed?'on':'off'} yt:${j.youtube?'on':'off'}`;
   } catch {
     qs('#healthPill').textContent = 'no api';
-    qs('#healthPill').style.background = '#3b2525';
   }
 })();
 
 function msg(text, ok=false) {
-  statusEl.innerHTML = ok ? `<span class="ok">${text}</span>` : `<span class="err">${text}</span>`;
-  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  statusEl.innerHTML = ok ? `<span class="text-[#7bd489]">${text}</span>` : `<span class="text-[#ff8a8a]">${text}</span>`;
+  setTimeout(() => { statusEl.textContent = ''; }, 2500);
 }
 
 function buildPayload() {
@@ -67,6 +70,28 @@ async function postApi(path, payload, expectBlob=false) {
   return data ?? { ok: true, notice: 'Empty JSON body returned.' };
 }
 
+function renderChart(insights) {
+  const ctx = qs('#insightsChart');
+  const grouped = insights.reduce((acc, it) => {
+    const k = (it.competitor || 'Brand').trim() || 'Brand';
+    acc[k] = (acc[k] || 0) + (Number(it.score) || 0);
+    return acc;
+  }, {});
+  const labels = Object.keys(grouped);
+  const data = Object.values(grouped);
+
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Score sum', data }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+
 function renderInsights(payload) {
   const insights = payload?.insights || payload?.results || payload?.data || payload?.items || [];
   const brand = payload?.summary?.brand || payload?.brand?.name || 'Unknown';
@@ -78,21 +103,23 @@ function renderInsights(payload) {
   qs('#kvCount').textContent = `insights: ${count}`;
 
   if (!count) {
-    resultTbl.style.display = 'none';
-    emptyState.style.display = 'block';
+    resultTbl.classList.add('hidden');
+    emptyState.classList.remove('hidden');
     return;
   }
 
   resultBody.innerHTML = insights.map(it => `
     <tr>
-      <td>${(it.competitor || '').toString()}</td>
-      <td>${(it.title || '').toString()}</td>
-      <td>${(it.score ?? '').toString()}</td>
-      <td>${(it.note || '').toString()}</td>
+      <td class="border-b border-border py-2 pr-3">${(it.competitor || '').toString()}</td>
+      <td class="border-b border-border py-2 pr-3">${(it.title || '').toString()}</td>
+      <td class="border-b border-border py-2 pr-3">${(it.score ?? '').toString()}</td>
+      <td class="border-b border-border py-2">${(it.note || '').toString()}</td>
     </tr>
   `).join('');
-  emptyState.style.display = 'none';
-  resultTbl.style.display = 'table';
+  emptyState.classList.add('hidden');
+  resultTbl.classList.remove('hidden');
+
+  renderChart(insights);
 }
 
 qs('#analyzeBtn').addEventListener('click', async () => {
@@ -105,7 +132,7 @@ qs('#analyzeBtn').addEventListener('click', async () => {
   } catch (e) { msg(e.message || 'Error'); }
 });
 
-qs('#exportBtn').addEventListener('click', async () => {
+qs('#exportCsvBtn').addEventListener('click', async () => {
   const payload = buildPayload();
   try {
     const blob = await postApi('/api/intelligence/export', payload, true);
@@ -116,4 +143,9 @@ qs('#exportBtn').addEventListener('click', async () => {
     URL.revokeObjectURL(url);
     msg('CSV downloaded.', true);
   } catch (e) { msg(e.message || 'Export failed'); }
+});
+
+// PDF export (print-optimized stylesheet)
+qs('#exportPdfBtn').addEventListener('click', () => {
+  window.print();
 });
