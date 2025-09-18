@@ -1,450 +1,348 @@
-# src/api/main.py — Signal & Scale v4.0.1 (clean)
-import os, io, csv, json, re, time
-from typing import Any, Dict, List, Optional
+# src/api/main.py
+from __future__ import annotations
+
+import csv
+import io
+import json
+import os
+import re
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
-from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 
-API_PREFIX = os.getenv("API_PREFIX", "/api").rstrip("/")
-app = FastAPI(title="Signal & Scale", version="4.0.1")
+APP_VERSION = "3.0.0"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
+# --------- Paths (serve frontend from frontend/dist) ---------
+HERE = os.path.dirname(os.path.abspath(__file__))
+# ../../frontend/dist relative to this file
+FRONTEND_DIR = os.path.normpath(os.path.join(HERE, "..", "..", "frontend", "dist"))
+# Allow override from env if you want
+FRONTEND_DIR = os.environ.get("WEB_DIR", FRONTEND_DIR)
+
+# --------- FastAPI init ---------
+app = FastAPI(
+    title="Signal & Scale",
+    version=APP_VERSION,
+    docs_url="/openapi.json",  # keep openapi JSON at /openapi.json
+    redoc_url=None,
+    swagger_ui_oauth2_redirect_url=None,
 )
 
-def _log(s: str): print(s, flush=True)
+# Basic CORS (relaxed — tighten for production domains if needed)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # set to your domain(s) in prod
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.middleware("http")
-async def _log_req(req, call_next):
-    resp = await call_next(req)
-    _log(f"{req.method} {req.url.path} -> {resp.status_code}")
-    return resp
+# --------- Static serving (no-cache for css/js to avoid stale UI) ---------
+class NoCacheStatic(StaticFiles):
+    async def get_response(self, path: str, scope):
+        resp = await super().get_response(path, scope)
+        # CSS/JS/json/map shouldn't be cached while you're iterating
+        if any(path.endswith(ext) for ext in (".css", ".js", ".json", ".map")):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+        return resp
 
-def _load_keys(env_name: str) -> List[str]:
-    raw = os.getenv(env_name, "").strip()
-    return [p.strip() for p in raw.replace("\n", ",").split(",") if p.strip()] if raw else []
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/web", NoCacheStatic(directory=FRONTEND_DIR, html=True), name="web")
 
-APP_API_KEYS = _load_keys("API_KEYS")
-
-def require_api_key(x_api_key: Optional[str] = Header(default=None)):
-    if APP_API_KEYS and (x_api_key not in APP_API_KEYS):
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    return x_api_key
-
+# --------- Schemas ---------
 class Brand(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
-    class Config: extra = "ignore"
 
 class Competitor(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
-    class Config: extra = "ignore"
 
 class AnalyzeRequest(BaseModel):
-    brand: Brand = Field(default_factory=Brand)
+    brand: Brand
     competitors: List[Competitor] = Field(default_factory=list)
-    mode: Optional[str] = "all"
-    window_days: Optional[int] = 7
-    reports: List[str] = Field(default_factory=list)  # optional pasted text
-    class Config: extra = "ignore"
+    mode: Optional[str] = Field(default="all")
+    window_days: Optional[int] = Field(default=7)
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc: RequestValidationError):
-    body = "<unreadable>"
+# --------- Utilities ---------
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+
+def _normalize_name(url_or_name: Optional[str]) -> str:
+    if not url_or_name:
+        return ""
+    s = url_or_name.strip()
+    if s.startswith("http"):
+        try:
+            host = re.sub(r"^https?://", "", s)
+            host = host.split("/")[0]
+            host = host.replace("www.", "")
+            host = host.split(":")[0]
+            return host
+        except Exception:
+            return s
+    return s
+
+async def quick_site_probe(url: Optional[str]) -> Dict[str, Any]:
+    """Very fast HEAD/GET probe to detect basic shop/checkout signals."""
+    if not url:
+        return {"reachable": False, "shop_pay": False, "apple_pay": False, "klarna": False, "checkout_steps": None}
+
+    if not url.startswith("http"):
+        url = "https://" + url
+
+    res_info: Dict[str, Any] = {
+        "reachable": False,
+        "status": None,
+        "server": None,
+        "shop_pay": False,
+        "apple_pay": False,
+        "klarna": False,
+        "checkout_steps": None,
+    }
+    t0 = time.perf_counter()
+    timeout = httpx.Timeout(6.0, connect=3.0)
+    headers = {"User-Agent": "SignalScale/1.0 (+https://signal-scale.app)"}
+
     try:
-        body = (await request.body()).decode("utf-8", errors="ignore")
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=headers) as client:
+            r = await client.get(url)
+            res_info["status"] = r.status_code
+            res_info["server"] = r.headers.get("server")
+            res_info["reachable"] = (200 <= r.status_code < 400)
+            text = (r.text or "")[:100_000].lower()
+            res_info["shop_pay"] = ("shop pay" in text) or ("shop.app/pay" in text)
+            res_info["apple_pay"] = ("apple pay" in text) or ("apple-pay" in text)
+            res_info["klarna"] = "klarna" in text
+            # naive checkout step heuristic
+            hints = sum(1 for kw in ("/cart", "/checkout", "checkout") if kw in text)
+            res_info["checkout_steps"] = min(3, max(1, hints)) if hints else None
     except Exception:
         pass
-    return JSONResponse(status_code=422, content={"detail": exc.errors(), "body_received": body})
+    finally:
+        res_info["latency_ms"] = int((time.perf_counter() - t0) * 1000)
+    return res_info
 
-ATHLETIC = {"nike","adidas","puma","under armour","underarmor","asics","new balance","reebok"}
-STREET   = {"stüssy","stussy","supreme","kith","palace","huf","pleasures","the hundreds","bape","a bathing ape","crooks","crooks & castles","bbc","ice cream","billionaire boys club","carrots","ksubi","paper planes"}
+def synthesize_insights(brand: Brand, comps: List[Competitor], probes: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """LLM-assisted if OPENAI is present; otherwise heuristic insights."""
+    # Aggregate probe facts
+    def badge(site: Dict[str, Any]) -> List[str]:
+        b = []
+        if site.get("shop_pay"): b.append("Shop Pay")
+        if site.get("apple_pay"): b.append("Apple Pay")
+        if site.get("klarna"): b.append("Klarna")
+        if site.get("checkout_steps"): b.append(f"{site['checkout_steps']}-step checkout")
+        return b
 
-def _slug(s: Optional[str]) -> str: return (s or "").strip().lower()
-
-def infer_category(brand: Brand, comps: List[Competitor]) -> str:
-    names = {_slug(brand.name)} | {_slug(c.name) for c in comps}
-    if names & ATHLETIC: return "athletic"
-    if names & STREET:   return "streetwear"
-    url = _slug(brand.url)
-    if any(k in url for k in ["run","sport","athlet"]): return "athletic"
-    return "apparel_lifestyle"
-
-def audience_archetypes(cat: str) -> List[str]:
-    if cat == "athletic":
-        return ["runners/trainers","performance athletes","fitness how-to TikTok","sports-fandom micros"]
-    if cat == "streetwear":
-        return ["fit-check micros","sneakerhead culture","music-adjacent tastemakers","archive/vintage curators"]
-    return ["lifestyle shoppers","UGC reviewers","deal hunters","campus creators"]
-
-def creator_playbook(cat: str) -> List[Dict[str, Any]]:
-    if cat == "athletic":
-        return [
-            {"type":"coach/athlete micro","why":"performance proof","activation":"seed + workout formats"},
-            {"type":"running TikTok","why":"tutorial demand","activation":"short drills UGC"},
-            {"type":"team fandom","why":"tribal loops","activation":"city/team capsules"},
-        ]
-    if cat == "streetwear":
-        return [
-            {"type":"fit-check micro","why":"context styling","activation":"styling challenge + affiliate"},
-            {"type":"sneakerhead","why":"release cycles","activation":"co-drop hooks + early pairs"},
-            {"type":"archival curator","why":"heritage story","activation":"archive→modern remix"},
-        ]
-    return [
-        {"type":"UGC reviewers","why":"social proof","activation":"rapid AB hooks"},
-        {"type":"campus creators","why":"peer discovery","activation":"ambassador kits"},
-    ]
-
-def competitor_focus_points(cat: str) -> List[str]:
-    if cat == "athletic":  return ["performance messaging","fit assurance","bundles","sports specialty distribution"]
-    if cat == "streetwear":return ["drop cadence/story","PDP media richness","collab/editorial hubs","community/UGC"]
-    return ["value clarity/entry price","PDP trust elements","checkout speed (express pays)"]
-
-ENABLE_PROBES = os.getenv("ENABLE_PROBES", "true").lower() != "false"
-PSI_API_KEY   = os.getenv("PSI_API_KEY", "").strip()
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
-
-def probe_site(url: str, timeout=10.0) -> Dict[str, Any]:
-    if not url: return {"ok": False, "reason":"no_url"}
-    u = url if url.startswith("http") else f"https://{url}"
-    headers = {"User-Agent":"SignalScale/1.0"}
-    try:
-        with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
-            r = client.get(u)
-            ttfb = r.elapsed.total_seconds()
-            html = r.text[:200_000]
-            size_kb = len(r.content) / 1024.0
-    except Exception as e:
-        return {"ok": False, "url": u, "reason": f"{type(e).__name__}: {e}"}
-
-    def has(patterns: List[str]) -> bool:
-        hay = html.lower()
-        return any(p.lower() in hay for p in patterns)
-
-    return {
-        "ok": True,
-        "url": u,
-        "status": r.status_code,
-        "ttfb_ms": int(ttfb*1000),
-        "bytes_kb": round(size_kb, 1),
-        "has_shop_pay": has(["Shop Pay","shop-pay-button","shopPay"]),
-        "has_apple_pay": has(["Apple Pay","apple-pay"]),
-        "has_klarna": has(["Klarna"]),
-        "has_afterpay": has(["Afterpay","After Pay"]),
-        "has_reviews": has(["reviews","yotpo","okendo","judge.me","loox"]),
-        "has_size_chart": has(["size chart","size guide"]),
-        "has_video": has(["<video","youtube.com","vimeo.com"]),
-        "has_collab_story": has(["collab","collaboration","capsule","collection story"]),
-        "has_blog_editorial": has(["blog","editorial","journal","stories"]),
-        "mobile_meta": has(['name="viewport"','content="width=device-width']),
+    summary: Dict[str, Any] = {
+        "brand": brand.name or _normalize_name(brand.url) or "Brand",
+        "competitors": [c.name or _normalize_name(c.url) for c in comps],
+        "window_days": None,
     }
 
-def fetch_pagespeed(url: str) -> Dict[str, Any]:
-    if not PSI_API_KEY or not url: return {}
-    endpoint = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-    params = {"url": url, "key": PSI_API_KEY, "strategy": "mobile"}
-    try:
-        with httpx.Client(timeout=30.0) as client:
-            r = client.get(endpoint, params=params)
-            if r.status_code != 200: return {}
-            data = r.json()
-            lhr = (data.get("lighthouseResult") or {})
-            cat = (lhr.get("categories") or {}).get("performance") or {}
-            audits = (lhr.get("audits") or {})
-            return {
-                "psi_perf_score": round((cat.get("score") or 0)*100),
-                "psi_cls": (audits.get("cumulative-layout-shift") or {}).get("numericValue"),
-                "psi_lcp": (audits.get("largest-contentful-paint") or {}).get("numericValue"),
-                "psi_tti": (audits.get("interactive") or {}).get("numericValue"),
-            }
-    except Exception:
-        return {}
+    signals: List[Dict[str, Any]] = []
+    b_site = probes.get("brand") or {}
+    for c in comps:
+        c_key = (c.name or _normalize_name(c.url) or "competitor").lower()
+        c_site = probes.get(c_key) or {}
+        # Simple scoring heuristic
+        b_pay = int(b_site.get("shop_pay") or b_site.get("apple_pay") or b_site.get("klarna") or 0)
+        c_pay = int(c_site.get("shop_pay") or c_site.get("apple_pay") or c_site.get("klarna") or 0)
+        b_latency = b_site.get("latency_ms") or 9999
+        c_latency = c_site.get("latency_ms") or 9999
 
-def youtube_mentions(brand: str, max_items=5) -> List[Dict[str, Any]]:
-    if not YOUTUBE_API_KEY or not brand: return []
-    q = f"{brand} streetwear"
-    url = "https://www.googleapis.com/youtube/v3/search"
-    params = {"part":"snippet", "q": q, "type":"video", "maxResults": max_items, "key": YOUTUBE_API_KEY}
-    try:
-        with httpx.Client(timeout=20.0) as client:
-            r = client.get(url, params=params)
-            if r.status_code != 200: return []
-            items = r.json().get("items", [])
-            out = []
-            for it in items:
-                sn = it.get("snippet", {})
-                out.append({
-                    "title": sn.get("title"),
-                    "channel": sn.get("channelTitle"),
-                    "published": sn.get("publishedAt"),
-                    "videoId": (it.get("id") or {}).get("videoId"),
-                })
-            return out
-    except Exception:
-        return []
-
-PROVIDER_ORDER = [p.strip().lower() for p in os.getenv("PROVIDER_ORDER", "openai").split(",") if p.strip()]
-OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL     = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-OPENAI_CHAT_URL  = os.getenv("OPENAI_CHAT_URL", "https://api.openai.com/v1/chat/completions").strip()
-OPENAI_TIMEOUT_S = float(os.getenv("OPENAI_TIMEOUT_S", "45"))
-ENRICH_ON_THIN   = os.getenv("ENRICH_ON_THIN", "true").lower() == "true"
-THIN_MIN_SIGNALS = int(os.getenv("THIN_MIN_SIGNALS", "3"))
-
-def synthesize_with_openai(brand: Brand, comps: List[Competitor], facts: Dict[str, Any]) -> List[Dict[str, Any]]:
-    if "openai" not in PROVIDER_ORDER or not OPENAI_API_KEY: return []
-    sys = {
-        "role":"system",
-        "content":(
-            "You are a decisive competitive intelligence operator. "
-            "Given JSON facts about a brand, its competitors, and site probes, "
-            "return STRICT JSON: {\"insights\":[{\"competitor\":\"\",\"title\":\"\",\"score\":0,\"note\":\"\"}]} "
-            "— 6-12 items, no markdown."
-        )
-    }
-    user = {"role":"user","content":json.dumps({
-        "brand": brand.dict(),
-        "competitors":[c.dict() for c in comps],
-        "facts": facts
-    }, ensure_ascii=False)}
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type":"application/json"}
-    body = {"model": OPENAI_MODEL, "messages":[sys, user], "temperature":0.2}
-
-    with httpx.Client(timeout=OPENAI_TIMEOUT_S) as client:
-        r = client.post(OPENAI_CHAT_URL, headers=headers, json=body)
-        r.raise_for_status()
-        data = r.json()
-    text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content")) or "{}"
-
-    out: List[Dict[str, Any]] = []
-    try:
-        parsed = json.loads(text)
-        for it in (parsed.get("insights") or []):
-            score_val = it.get("score", 0)
-            score = int(score_val) if isinstance(score_val, (int,float)) else 0
-            out.append({
-                "brand": brand.name or "Unknown",
-                "competitor": it.get("competitor",""),
-                "signal": it.get("title",""),
-                "score": score,
-                "note": f"source: openai | {it.get('note','')}"
+        comp_name = c.name or _normalize_name(c.url) or "Competitor"
+        # Gap or strength based on payments and latency
+        if c_pay and not b_pay:
+            signals.append({
+                "brand": summary["brand"],
+                "competitor": comp_name,
+                "signal": "Checkout trust gap",
+                "note": f"{comp_name} shows pay options ({', '.join(badge(c_site))}); add accelerated pay on PDP/checkout.",
+                "score": 82,
+                "source": {"brand_site": brand.url, "competitor_site": c.url, "probe": "payments"},
             })
-    except Exception:
-        pass
-    return out
+        if c_latency + 200 < b_latency:
+            signals.append({
+                "brand": summary["brand"],
+                "competitor": comp_name,
+                "signal": "Site performance gap",
+                "note": f"{comp_name} home loads faster (~{c_latency}ms vs {b_latency}ms). Audit hero weight, defer non-critical JS.",
+                "score": 74,
+                "source": {"brand_site": brand.url, "competitor_site": c.url, "probe": "latency"},
+            })
+        if b_pay and not c_pay:
+            signals.append({
+                "brand": summary["brand"],
+                "competitor": comp_name,
+                "signal": "Trust advantage",
+                "note": f"You surface accelerated pay ({', '.join(badge(b_site))}); emphasize above the fold on PDP.",
+                "score": 68,
+                "source": {"brand_site": brand.url, "competitor_site": c.url, "probe": "payments"},
+            })
 
-def heuristic_insights(req: AnalyzeRequest, facts: Dict[str, Any]) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
-    cat = facts.get("category","unknown")
-    probes = facts.get("probes", {})
+    # If no signals yet, add a baseline
+    if not signals:
+        signals.append({
+            "brand": summary["brand"],
+            "competitor": None,
+            "signal": "Baseline",
+            "note": "No clear checkout/speed deltas detected. Add competitor PDP audits to uncover content gaps (video, size chart, UGC).",
+            "score": 50,
+            "source": {"probe": "baseline"},
+        })
 
-    b = probes.get("brand") or {}
-    if b.get("ok"):
-        if not b.get("mobile_meta"): rows.append({"brand": req.brand.name, "competitor":"", "signal":"Missing/weak mobile meta viewport", "score":45, "note":"UX/Mobile"})
-        if not b.get("has_reviews"): rows.append({"brand": req.brand.name, "competitor":"", "signal":"Add reviews widget to PDPs", "score":62, "note":"Trust/Conversion"})
-        if b.get("ttfb_ms", 800) > 1200: rows.append({"brand": req.brand.name, "competitor":"", "signal":f"Slow TTFB ~{b['ttfb_ms']}ms — cache/CDN tune", "score":58, "note":"Speed"})
+    result = {"ok": True, "summary": summary, "signals": signals, "probes": probes}
 
-    for c in req.competitors:
-        key = c.name or ""
-        p = probes.get(key) or {}
-        if not p: continue
-        if p.get("has_video"): rows.append({"brand": req.brand.name, "competitor": c.name, "signal":"Competitor uses rich PDP video", "score":60, "note":"Raise PDP media richness"})
-        if p.get("has_collab_story"): rows.append({"brand": req.brand.name, "competitor": c.name, "signal":"Competitor leans on collaboration storytelling", "score":57, "note":"Editorial/Collab hub"})
-        if p.get("has_apple_pay") and not b.get("has_apple_pay"): rows.append({"brand": req.brand.name, "competitor": c.name, "signal":"Competitor offers Apple Pay; parity recommended", "score":63, "note":"Checkout friction"})
+    # Optional: LLM enrichment (kept minimal; no background calls if no key)
+    if OPENAI_API_KEY and len(signals) > 0:
+        try:
+            import asyncio
+            from httpx import Timeout
+            # Use OpenAI Responses API via HTTP (keeps deps minimal)
+            system = (
+                "You are a retail brand intelligence strategist. "
+                "Given site probes and gaps, return 3 prioritized, high-impact moves "
+                "for the next 30 days. Be specific, measurable, and channel-aware."
+            )
+            user = json.dumps({"brand": brand.model_dump(), "competitors": [c.model_dump() for c in comps], "probes": probes, "signals": signals})
+            payload = {
+                "model": "gpt-4o-mini",
+                "input": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                "max_output_tokens": 600,
+            }
+            async def call_openai():
+                async with httpx.AsyncClient(timeout=Timeout(20.0)) as client:
+                    r = await client.post(
+                        "https://api.openai.com/v1/responses",
+                        headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+                        json=payload,
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+                    # The Responses API returns output in 'output_text' (convenience) when present
+                    text = data.get("output_text") or json.dumps(data, indent=2)
+                    return text
+            text = asyncio.get_event_loop().run_until_complete(call_openai())
+            result["recommendations"] = text
+        except Exception as e:
+            result["llm_error"] = str(e)
 
-    for a in audience_archetypes(cat):
-        rows.append({"brand": req.brand.name, "competitor":"", "signal": f"Audience to activate: {a}", "score":55, "note": f"category: {cat}"})
-    for cp in creator_playbook(cat):
-        rows.append({"brand": req.brand.name, "competitor":"", "signal": f"Creator play: {cp['type']} — {cp['activation']}", "score":58, "note": f"why: {cp['why']} | {cat}"})
-    for f in competitor_focus_points(cat):
-        rows.append({"brand": req.brand.name, "competitor":"", "signal": f"Competitor focus: {f}", "score":57, "note": f"category: {cat}"})
+    return result
 
-    if facts.get("youtube", {}).get(req.brand.name or "brand"):
-        rows.append({"brand": req.brand.name, "competitor":"", "signal":"YouTube chatter detected — mine creators for collab fits", "score":59, "note":"social"})
-
-    seen, uniq = set(), []
-    for r in rows:
-        k = (_slug(r.get("competitor")), _slug(r.get("signal")))
-        if k not in seen:
-            uniq.append(r); seen.add(k)
-    return uniq
-
-def build_facts(req: AnalyzeRequest) -> Dict[str, Any]:
-    cat = infer_category(req.brand, req.competitors)
-    facts: Dict[str, Any] = {"category": cat, "probes": {}, "pagespeed": {}, "youtube": {}}
-
-    if ENABLE_PROBES:
-        probes: Dict[str, Any] = {}
-        for idx, item in enumerate([req.brand] + req.competitors):
-            key = "brand" if idx == 0 else (item.name or f"competitor_{idx}")
-            probes[key] = probe_site(item.url or item.name or "")
-            if PSI_API_KEY and (item.url or ""):
-                facts["pagespeed"][key] = fetch_pagespeed(item.url)
-        facts["probes"] = probes
-
-    yts = youtube_mentions(req.brand.name or "")
-    if yts: facts["youtube"][req.brand.name or "brand"] = yts
-
-    if req.reports:
-        joined = "\n\n".join([t for t in req.reports if t.strip()])
-        facts["report_text"] = joined[:200000]
-
-    return facts
-
-def analyze_core(req: AnalyzeRequest) -> Dict[str, Any]:
-    facts = build_facts(req)
-    rows = heuristic_insights(req, facts)
-    try:
-        rows_ai = synthesize_with_openai(req.brand, req.competitors, facts)
-        seen = {(_slug(x.get("competitor")), _slug(x.get("signal"))) for x in rows}
-        for r in rows_ai:
-            k = (_slug(r.get("competitor")), _slug(r.get("signal")))
-            if k not in seen: rows.append(r); seen.add(k)
-    except Exception as e:
-        _log(f"[openai_error] {e}")
-
-    if ENRICH_ON_THIN and (len([r for r in rows if (r.get("signal") or '').strip()]) < THIN_MIN_SIGNALS):
-        rows += heuristic_insights(req, {"category": infer_category(req.brand, req.competitors), "probes": {}})[:6]
-
-    return {
-        "ok": True,
-        "brand": req.brand.dict(),
-        "competitors_count": len(req.competitors),
-        "category_inferred": infer_category(req.brand, req.competitors),
-        "facts": {"pagespeed_used": bool(PSI_API_KEY), "youtube_used": bool(YOUTUBE_API_KEY), "probes_enabled": ENABLE_PROBES},
-        "signals": rows
-    }
-
-def _shape_for_ui(result: Dict[str, Any]) -> Dict[str, Any]:
-    signals = result.get("signals", [])
-    insights = [{
-        "competitor": r.get("competitor",""),
-        "title": r.get("signal",""),
-        "score": r.get("score",0),
-        "note": r.get("note",""),
-    } for r in signals]
-    payload = dict(result)
-    payload["insights"] = insights
-    payload["summary"]  = {
-        "brand": result.get("brand",{}).get("name") or "Unknown",
-        "competitors_count": result.get("competitors_count",0),
-        "category": result.get("category_inferred","unknown"),
-        "insight_count": len(insights)
-    }
-    payload["results"] = payload["data"] = payload["items"] = insights
-    return payload
-
-@app.get(f"{API_PREFIX}/health")
-def health():
+# --------- Routes ---------
+@app.get("/api/health")
+async def api_health():
     return {
         "ok": True,
         "service": "signal-scale",
-        "version": "4.0.1",
-        "keys_enabled": bool(APP_API_KEYS),
+        "version": APP_VERSION,
+        "frontend_dir_exists": os.path.isdir(FRONTEND_DIR),
+        "frontend_dir": FRONTEND_DIR,
         "openai_configured": bool(OPENAI_API_KEY),
-        "provider_order": PROVIDER_ORDER,
-        "pagespeed": bool(PSI_API_KEY),
-        "youtube": bool(YOUTUBE_API_KEY),
-        "probes": ENABLE_PROBES
     }
 
-@app.get("/api/health")
-def health_legacy(): return health()
-@app.get("/health")
-def health_alias():  return health()
+@app.post("/api/intelligence/analyze")
+async def analyze(req: AnalyzeRequest, x_api_key: Optional[str] = Header(default=None, convert_underscores=False)):
+    # Optional header-based simple auth:
+    required_keys = (os.environ.get("API_KEYS") or "").split(",") if os.environ.get("API_KEYS") else []
+    if required_keys:
+        token = (x_api_key or "").strip()
+        if token not in [k.strip() for k in required_keys if k.strip()]:
+            raise HTTPException(status_code=401, detail="Invalid API key")
 
-@app.post(f"{API_PREFIX}/intelligence/analyze")
-def analyze_pref(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return _shape_for_ui(analyze_core(req))
+    # Run quick probes for brand + competitors
+    probes: Dict[str, Dict[str, Any]] = {}
+    key_brand = (req.brand.name or _normalize_name(req.brand.url) or "brand").lower()
+    probes["brand"] = await quick_site_probe(req.brand.url)
+    for c in req.competitors:
+        key = (c.name or _normalize_name(c.url) or "competitor").lower()
+        probes[key] = await quick_site_probe(c.url)
 
-@app.post("/intelligence/analyze")
-def analyze_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return _shape_for_ui(analyze_core(req))
+    result = synthesize_insights(req.brand, req.competitors, probes)
+    return JSONResponse(result)
 
-@app.post(f"{API_PREFIX}/intelligence/export")
-def export_pref(req: AnalyzeRequest, _=Depends(require_api_key)):
-    result = analyze_core(req)
-    rows = result.get("signals", [])
-    buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=["brand","competitor","signal","score","note"])
-    w.writeheader()
-    brand_name = (req.brand.name or "Unknown")
-    for r in rows:
-        w.writerow({
-            "brand": brand_name,
-            "competitor": r.get("competitor",""),
-            "signal": r.get("signal",""),
-            "score": r.get("score",""),
-            "note": r.get("note",""),
-        })
-    # ✅ FIX: header quotes were broken before
-    return StreamingResponse(
-        io.BytesIO(buf.getvalue().encode("utf-8")),
-        media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="signal_scale_export.csv"'}
-    )
+@app.post("/api/intelligence/export")
+async def export_csv(req: AnalyzeRequest):
+    # Reuse analyze logic for now
+    probes: Dict[str, Dict[str, Any]] = {}
+    probes["brand"] = await quick_site_probe(req.brand.url)
+    for c in req.competitors:
+        key = (c.name or _normalize_name(c.url) or "competitor").lower()
+        probes[key] = await quick_site_probe(c.url)
+    data = synthesize_insights(req.brand, req.competitors, probes)
 
-@app.post("/intelligence/export")
-def export_alias(req: AnalyzeRequest, _=Depends(require_api_key)):
-    return export_pref(req, _)
+    # Build CSV
+    output = io.StringIO()
+    w = csv.writer(output)
+    w.writerow(["brand", "competitor", "signal", "note", "score", "source"])
+    for s in data.get("signals", []):
+        w.writerow([
+            s.get("brand"),
+            s.get("competitor") or "",
+            s.get("signal"),
+            s.get("note"),
+            s.get("score"),
+            json.dumps(s.get("source") or {}),
+        ])
+    csv_bytes = io.BytesIO(output.getvalue().encode("utf-8"))
+    headers = {"Content-Disposition": 'attachment; filename="signal_scale_export.csv"'}
+    return StreamingResponse(csv_bytes, media_type="text/csv; charset=utf-8", headers=headers)
 
-def _find_web_dir() -> str:
-    override = os.getenv("WEB_DIR", "").strip()
-    if override and os.path.exists(os.path.join(override, "index.html")): return override
-    base = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(base, "web"),
-        os.path.join(base, "..", "web"),
-        os.path.join(base, "..", "..", "web"),
-        os.path.join(base, "..", "..", "frontend", "dist"),
-        os.path.join(os.getcwd(), "frontend", "dist"),
-        os.path.join(os.getcwd(), "web"),
-    ]
-    for c in map(os.path.abspath, candidates):
-        if os.path.exists(os.path.join(c, "index.html")): return c
-    return os.path.abspath(os.path.join(base, "web"))
+# --------- Root + SPA fallback ---------
+def _index_path() -> str:
+    return os.path.join(FRONTEND_DIR, "index.html")
 
-WEB_DIR = _find_web_dir()
-INDEX_HTML = os.path.join(WEB_DIR, "index.html")
-_log(f"[startup] USING WEB_DIR={WEB_DIR} exists={os.path.isdir(WEB_DIR)}")
-_log(f"[startup] INDEX_HTML exists={os.path.exists(INDEX_HTML)}")
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    if not os.path.isfile(_index_path()):
+        return HTMLResponse(
+            f"<h1>Frontend not found</h1><p>Expected: { _index_path() }</p>",
+            status_code=404,
+        )
+    return FileResponse(_index_path())
 
-assets_dir = os.path.join(WEB_DIR, "assets")
-if os.path.isdir(assets_dir):
-    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
-
-_DOC_PATHS = {"/openapi.json", "/docs", "/docs/index.html", "/redoc", "/favicon.ico"}
-
-@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
-def root():
-    if not os.path.exists(INDEX_HTML):
-        return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected: <code>{INDEX_HTML}</code></p>", status_code=500)
-    return FileResponse(INDEX_HTML)
-
-from fastapi import HTTPException
-@app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
-def spa_fallback(full_path: str):
-    p = "/" + (full_path or "")
-    if p in _DOC_PATHS or p.startswith("/api") or p.startswith("/v1") or p.startswith("/intelligence"):
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def spa_fallback(full_path: str):
+    # Serve SPA index.html for any non-API path
+    if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
-    if not os.path.exists(INDEX_HTML):
-        return HTMLResponse(f"<h1>Frontend not found</h1><p>Expected: <code>{INDEX_HTML}</code></p>", status_code=500)
-    return FileResponse(INDEX_HTML)
+    if not os.path.isfile(_index_path()):
+        return HTMLResponse(
+            f"<h1>Frontend not found</h1><p>Expected: { _index_path() }</p>",
+            status_code=404,
+        )
+    return FileResponse(_index_path())
 
+# --------- Debug (optional) ---------
 @app.get("/debug", response_class=PlainTextResponse)
-def debug(_=Depends(require_api_key)):
-    demo = analyze_core(AnalyzeRequest(
-        brand=Brand(name="Demo Brand", url="example.com"),
-        competitors=[Competitor(name="Peer A", url="https://stussy.com"), Competitor(name="Peer B", url="https://hufworldwide.com")]
-    ))
-    return f"category={demo.get('category_inferred')} insights={len(demo.get('signals',[]))}"
+async def debug():
+    lines = [
+        f"version: {APP_VERSION}",
+        f"FRONTEND_DIR: {FRONTEND_DIR}",
+        f"exists: {os.path.isdir(FRONTEND_DIR)}",
+        f"OPENAI configured: {bool(OPENAI_API_KEY)}",
+    ]
+    try:
+        if os.path.isdir(FRONTEND_DIR):
+            files = sorted(os.listdir(FRONTEND_DIR))
+            lines.append("files: " + ", ".join(files[:30]))
+    except Exception as e:
+        lines.append(f"ls error: {e}")
+    return PlainTextResponse("\n".join(lines))
