@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signal & Scale - Dynamic Brand Intelligence Platform</title>
+    <title>Signal & Scale - Comprehensive Brand Intelligence Platform</title>
     <style>
         * {
             margin: 0;
@@ -260,7 +260,7 @@
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -350,73 +350,94 @@
             color: #16a34a;
         }
 
+        .insight-content {
+            margin-bottom: 1rem;
+        }
+
         .insight-recommendation {
             font-weight: 600;
             margin-bottom: 0.5rem;
         }
 
-        .insight-rationale {
+        .insight-details {
             color: #64748b;
             font-size: 0.875rem;
             line-height: 1.5;
         }
 
-        .data-sources {
-            margin-top: 2rem;
+        .platform-metrics {
+            margin-bottom: 2rem;
         }
 
-        .source-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
+        .platform-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .platform-card {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .platform-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 0.5rem;
         }
 
-        .source-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .source-name {
+        .platform-name {
             font-weight: 600;
             color: #2c3e50;
         }
 
-        .source-type {
-            font-size: 0.875rem;
-            color: #64748b;
-        }
-
-        .source-url {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 0.875rem;
-        }
-
-        .confidence-score {
-            font-weight: 600;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.875rem;
-        }
-
-        .confidence-high {
+        .verification-badge {
             background: rgba(34, 197, 94, 0.1);
             color: #16a34a;
+            padding: 0.25rem 0.5rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
-        .confidence-medium {
-            background: rgba(245, 158, 11, 0.1);
-            color: #d97706;
+        .platform-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            font-size: 0.875rem;
         }
 
-        .confidence-low {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .competitive-analysis {
+            margin-bottom: 2rem;
+        }
+
+        .competitor-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .competitor-header {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .competitor-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            font-size: 0.875rem;
         }
 
         @media (max-width: 768px) {
@@ -429,7 +450,7 @@
             }
             
             .metrics-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
             }
             
             .header {
@@ -448,7 +469,7 @@
             <div class="logo-icon">S&S</div>
             <div>
                 <div>Signal & Scale</div>
-                <div style="font-size: 0.75rem; font-weight: 400; color: #64748b;">Dynamic Brand Intelligence Platform</div>
+                <div style="font-size: 0.75rem; font-weight: 400; color: #64748b;">Comprehensive Brand Intelligence Platform</div>
             </div>
         </div>
         <div class="header-actions">
@@ -459,13 +480,13 @@
 
     <div class="container">
         <div class="analysis-form" id="analysisForm">
-            <h2 class="form-title">Dynamic Brand Intelligence Analysis</h2>
-            <p class="form-subtitle">Enter your brand details to generate comprehensive competitive intelligence with real-time data</p>
+            <h2 class="form-title">Comprehensive Brand Intelligence Analysis</h2>
+            <p class="form-subtitle">Enter your brand details to generate investment-grade competitive intelligence with strategic insights</p>
             
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">Brand Name *</label>
-                    <input type="text" class="form-input" id="brandName" placeholder="e.g., Supreme, Nike, Off-White">
+                    <input type="text" class="form-input" id="brandName" placeholder="e.g., Nike, Supreme, Tesla">
                 </div>
                 
                 <div class="form-group">
@@ -474,7 +495,7 @@
                 </div>
                 
                 <div class="form-group full-width">
-                    <label class="form-label">Competitors (up to 5)</label>
+                    <label class="form-label">Competitors (up to 3)</label>
                     <div class="competitors-grid">
                         <input type="text" class="form-input" id="competitor1" placeholder="Competitor 1">
                         <input type="text" class="form-input" id="competitor2" placeholder="Competitor 2">
@@ -486,15 +507,15 @@
                     <label class="form-label">Analysis Type</label>
                     <select class="form-select" id="analysisType">
                         <option value="complete_analysis">Complete Analysis</option>
-                        <option value="weekly_report">Weekly Report</option>
-                        <option value="cultural_radar">Cultural Radar</option>
-                        <option value="peer_tracker">Peer Tracker</option>
+                        <option value="strategic_insights">Strategic Insights</option>
+                        <option value="competitive_intelligence">Competitive Intelligence</option>
+                        <option value="digital_presence">Digital Presence</option>
                     </select>
                 </div>
             </div>
             
             <button class="analyze-btn" onclick="startAnalysis()">
-                ▶ Start Dynamic Analysis
+                ▶ Start Comprehensive Analysis
             </button>
         </div>
 
@@ -503,48 +524,59 @@
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
-            <p class="progress-text" id="progressText">Initializing dynamic analysis...</p>
+            <p class="progress-text" id="progressText">Initializing comprehensive analysis...</p>
         </div>
 
         <div class="results-section" id="resultsSection">
             <div class="results-header">
                 <div>
-                    <h2 class="results-title" id="resultsTitle">Brand Intelligence Report for Nike</h2>
-                    <p class="results-subtitle" id="resultsSubtitle">Generated: 9/18/2025, 4:21:31 PM</p>
+                    <h2 class="results-title" id="resultsTitle">Brand Intelligence Report</h2>
+                    <p class="results-subtitle" id="resultsSubtitle">Generated: Loading...</p>
                 </div>
                 <button class="export-btn" id="exportPdfBtn">📄 Export PDF</button>
             </div>
 
             <div class="metrics-grid">
                 <div class="metric-card">
-                    <div class="metric-value" id="activeCreators">90</div>
-                    <div class="metric-label">Active Creators</div>
+                    <div class="metric-value" id="influenceScore">0.0</div>
+                    <div class="metric-label">Influence Score</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-value" id="avgInfluenceScore">10,177,402</div>
-                    <div class="metric-label">Avg Influence Score</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value" id="competitiveScore">8.2</div>
+                    <div class="metric-value" id="competitiveScore">0.0</div>
                     <div class="metric-label">Competitive Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="siteScore">0.0</div>
+                    <div class="metric-label">Site Optimization</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="brandHealthScore">0.0</div>
+                    <div class="metric-label">Brand Health</div>
                 </div>
             </div>
 
             <div class="confidence-badge" id="confidenceBadge">
-                ✓ Real-time Data Quality: 56% confidence
+                ✓ Data Quality: 0% confidence
+            </div>
+
+            <div class="platform-metrics">
+                <h3 class="section-title">Platform Performance Analysis</h3>
+                <div class="platform-grid" id="platformGrid">
+                    <!-- Dynamic platform metrics will be loaded here -->
+                </div>
             </div>
 
             <div class="insights-section">
-                <h3 class="section-title">Prioritized Strategic Insights</h3>
+                <h3 class="section-title">Strategic Insights & Recommendations</h3>
                 <div id="strategicInsights">
                     <!-- Dynamic insights will be loaded here -->
                 </div>
             </div>
 
-            <div class="data-sources">
-                <h3 class="section-title">Real-time Data Sources</h3>
-                <div id="dataSources">
-                    <!-- Dynamic data sources will be loaded here -->
+            <div class="competitive-analysis">
+                <h3 class="section-title">Competitive Intelligence</h3>
+                <div id="competitiveAnalysis">
+                    <!-- Dynamic competitive analysis will be loaded here -->
                 </div>
             </div>
         </div>
@@ -593,8 +625,8 @@
                 // Start progress animation
                 animateProgress();
                 
-                // Call API - Updated to work with your repository structure
-                const response = await fetch('/api/analyze', {
+                // Call API
+                const response = await fetch('http://localhost:8001/api/analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -626,11 +658,11 @@
             const progressText = document.getElementById('progressText');
             
             const steps = [
-                { progress: 20, text: 'Collecting social media data...' },
-                { progress: 40, text: 'Analyzing competitor intelligence...' },
-                { progress: 60, text: 'Processing creator insights...' },
-                { progress: 80, text: 'Generating strategic recommendations...' },
-                { progress: 100, text: 'Finalizing report...' }
+                { progress: 20, text: 'Collecting comprehensive brand data...' },
+                { progress: 40, text: 'Analyzing platform performance...' },
+                { progress: 60, text: 'Processing competitive intelligence...' },
+                { progress: 80, text: 'Generating strategic insights...' },
+                { progress: 100, text: 'Finalizing comprehensive report...' }
             ];
 
             let currentStep = 0;
@@ -654,15 +686,50 @@
 
             // Update header
             document.getElementById('resultsTitle').textContent = `Brand Intelligence Report for ${data.brand_name}`;
-            document.getElementById('resultsSubtitle').textContent = `Generated: ${data.generated_at}`;
+            document.getElementById('resultsSubtitle').textContent = `Analysis ID: ${data.analysis_id} | Generated: ${data.generated_at}`;
 
             // Update metrics
-            document.getElementById('activeCreators').textContent = data.active_creators;
-            document.getElementById('avgInfluenceScore').textContent = data.avg_influence_score.toLocaleString();
-            document.getElementById('competitiveScore').textContent = data.competitive_score;
+            document.getElementById('influenceScore').textContent = data.avg_influence_score.toFixed(1);
+            document.getElementById('competitiveScore').textContent = data.competitive_score.toFixed(1);
+            document.getElementById('siteScore').textContent = data.site_optimization_score.toFixed(1);
+            document.getElementById('brandHealthScore').textContent = data.brand_health_score.toFixed(1);
 
             // Update confidence badge
-            document.getElementById('confidenceBadge').innerHTML = `✓ Real-time Data Quality: ${data.data_confidence}% confidence`;
+            document.getElementById('confidenceBadge').innerHTML = `✓ Data Quality: ${data.data_quality_score}% confidence`;
+
+            // Display platform metrics
+            const platformGrid = document.getElementById('platformGrid');
+            platformGrid.innerHTML = '';
+            
+            data.platform_metrics.forEach(platform => {
+                const platformCard = document.createElement('div');
+                platformCard.className = 'platform-card';
+                platformCard.innerHTML = `
+                    <div class="platform-header">
+                        <div class="platform-name">${platform.platform}</div>
+                        ${platform.verification_status ? '<div class="verification-badge">✓ Verified</div>' : ''}
+                    </div>
+                    <div class="platform-stats">
+                        <div class="stat-item">
+                            <span>Followers:</span>
+                            <span>${platform.followers.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Engagement:</span>
+                            <span>${platform.engagement_rate}%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Influence Score:</span>
+                            <span>${platform.influence_score.toFixed(1)}/10</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Performance:</span>
+                            <span>${platform.performance_grade}</span>
+                        </div>
+                    </div>
+                `;
+                platformGrid.appendChild(platformCard);
+            });
 
             // Display strategic insights
             const insightsContainer = document.getElementById('strategicInsights');
@@ -677,34 +744,53 @@
                 insightCard.innerHTML = `
                     <div class="insight-header">
                         <div class="insight-category">${insight.category}</div>
-                        <div class="priority-badge ${priorityClass}">${insight.priority}</div>
+                        <div class="priority-badge ${priorityClass}">${insight.priority} Priority</div>
                     </div>
-                    <div class="insight-recommendation"><strong>Recommendation:</strong> ${insight.recommendation}</div>
-                    <div class="insight-rationale"><strong>Rationale:</strong> ${insight.rationale}</div>
+                    <div class="insight-content">
+                        <div class="insight-recommendation"><strong>Strategic Insight:</strong> ${insight.insight}</div>
+                        <div class="insight-recommendation"><strong>Recommendation:</strong> ${insight.recommendation}</div>
+                        <div class="insight-details">
+                            <strong>Impact Score:</strong> ${insight.impact_score}/10 | 
+                            <strong>Timeline:</strong> ${insight.implementation_timeline} | 
+                            <strong>Investment:</strong> ${insight.investment_required} | 
+                            <strong>ROI:</strong> ${insight.roi_projection}
+                        </div>
+                    </div>
                 `;
                 insightsContainer.appendChild(insightCard);
             });
 
-            // Display data sources
-            const sourcesContainer = document.getElementById('dataSources');
-            sourcesContainer.innerHTML = '';
+            // Display competitive analysis
+            const competitiveContainer = document.getElementById('competitiveAnalysis');
+            competitiveContainer.innerHTML = '';
             
-            data.data_sources.forEach(source => {
-                const confidenceClass = source.confidence >= 0.8 ? 'confidence-high' : 
-                                      source.confidence >= 0.4 ? 'confidence-medium' : 'confidence-low';
-                const confidenceText = `${Math.round(source.confidence * 100)}% confidence`;
+            data.competitive_analysis.forEach(competitor => {
+                const competitorCard = document.createElement('div');
+                competitorCard.className = 'competitor-card';
                 
-                const sourceItem = document.createElement('div');
-                sourceItem.className = 'source-item';
-                sourceItem.innerHTML = `
-                    <div class="source-info">
-                        <div class="source-name">${source.source}</div>
-                        <div class="source-type">${source.type}</div>
-                        <a href="${source.url}" class="source-url" target="_blank">${source.url}</a>
+                const brandValue = competitor.brand_value ? 
+                    (competitor.brand_value > 1000000000 ? 
+                        `$${(competitor.brand_value / 1000000000).toFixed(1)}B` : 
+                        `$${(competitor.brand_value / 1000000).toFixed(0)}M`) : 'N/A';
+                
+                competitorCard.innerHTML = `
+                    <div class="competitor-header">${competitor.competitor_name}</div>
+                    <div class="competitor-stats">
+                        <div>
+                            <strong>Total Followers:</strong><br>
+                            ${competitor.total_followers.toLocaleString()}
+                        </div>
+                        <div>
+                            <strong>Avg Engagement:</strong><br>
+                            ${competitor.avg_engagement_rate.toFixed(1)}%
+                        </div>
+                        <div>
+                            <strong>Brand Value:</strong><br>
+                            ${brandValue}
+                        </div>
                     </div>
-                    <div class="confidence-score ${confidenceClass}">${confidenceText}</div>
                 `;
-                sourcesContainer.appendChild(sourceItem);
+                competitiveContainer.appendChild(competitorCard);
             });
         }
 
@@ -713,14 +799,14 @@
             if (!currentBrandName) return;
             
             try {
-                const response = await fetch(`/api/export-pdf/${currentBrandName}`);
+                const response = await fetch(`http://localhost:8001/api/export-pdf/${currentBrandName}`);
                 if (response.ok) {
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = `${currentBrandName}_report.pdf`;
+                    a.download = `${currentBrandName}_Comprehensive_Brand_Intelligence_Report.pdf`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
