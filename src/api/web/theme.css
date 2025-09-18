@@ -1,0 +1,61 @@
+/* ===== Signal & Scale Design Tokens ===== */
+:root {
+  /* Core palette */
+  --bg: #070a12;
+  --bg-2: #0b0f19;
+  --surface: #0d1222;          /* glass base */
+  --ink: #edf2f9;              /* primary text */
+  --muted: #a7b4c8;
+  --line: #212a3d;
+
+  /* Brand accents */
+  --accent: #d4af37;           /* Scale Gold */
+  --accent-ink: #0e0a04;       /* for text on gold */
+  --action: #2f89ff;           /* Signal Blue */
+  --action-ink: #061126;
+
+  /* Success / warn (subtle) */
+  --ok: #78e2b7;
+  --warn: #ffd166;
+  --bad: #ff7b7b;
+
+  /* Elevation */
+  --glass: rgba(13, 18, 34, 0.78);
+  --shadow-soft: 0 20px 60px rgba(0,0,0,.35);
+  --ring: 0 0 0 1px var(--line) inset;
+
+  /* Typo */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Scale */
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-xs: 10px;
+  --space-1: 6px; --space-2: 10px; --space-3: 14px; --space-4: 16px; --space-5: 20px; --space-6: 28px;
+
+  /* Chart defaults */
+  --chart-bars: var(--accent);
+  --chart-grid: #24314a;
+  --chart-ink: var(--ink);
+
+  /* Print overrides will come from styles.css @media print */
+}
+
+/* ===== Optional Light Theme ===== */
+:root.theme-light {
+  --bg: #fff;
+  --bg-2: #f7f8fb;
+  --surface: #fffffff2;
+  --ink: #0e1320;
+  --muted: #5f6b7c;
+  --line: #e5e7eb;
+  --accent: #b38728;
+  --accent-ink: #0e0a04;
+  --action: #2563eb;
+  --action-ink: #f1f5ff;
+  --glass: rgba(255,255,255,0.82);
+  --shadow-soft: 0 12px 40px rgba(2,6,23,.08);
+  --ring: 0 0 0 1px var(--line) inset;
+  --chart-grid: #e8edf4;
+}
