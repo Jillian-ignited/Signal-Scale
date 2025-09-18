@@ -1,0 +1,49 @@
+:root {
+  /* brand + surfaces */
+  --bg: #0b1121;
+  --bg-2: #0d1324;
+  --glass: #0f16282e;
+  --line: #212a42;
+  --ink: #eaf1ff;
+  --muted: #9fb0cc;
+
+  --accent: #2bc28f;
+  --accent-ink: #02150f;
+
+  /* print */
+  --print-ink: #111;
+  --print-line: #dadfe7;
+  --print-accent: #2bc28f;
+  --print-brand: "Signal & Scale";
+
+  /* layout */
+  --container-max: 1480px;
+  --sidebar-w: 300px;
+
+  /* radius */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+
+  /* spacing */
+  --s-4: 16px;
+  --s-5: 20px;
+
+  /* fonts */
+  --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* sizes */
+  --fs-1: 12px;
+  --fs-2: 13px;
+  --fs-3: 14px;
+  --fs-4: 18px;
+  --fs-5: 22px;
+  --fs-6: 28px;
+
+  /* motion */
+  --easing: cubic-bezier(.22,.8,.12,.99);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --ring: 0 0 0 0 rgba(0,0,0,0);
+}
