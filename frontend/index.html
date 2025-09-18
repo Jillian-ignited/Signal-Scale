@@ -1,178 +1,737 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Signal & Scale</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal & Scale - Dynamic Brand Intelligence Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <!-- Theme + App styles -->
-  <link rel="stylesheet" href="/theme.css">
-  <link rel="stylesheet" href="/styles.css">
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: #2c3e50;
+        }
 
-  <!-- Chart.js (for simple charts) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer></script>
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
 
-  <!-- App entry -->
-  <script type="module" src="/app.js"></script>
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .plan-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .new-analysis-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .new-analysis-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .analysis-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .form-subtitle {
+            color: #64748b;
+            margin-bottom: 2rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+
+        .form-input, .form-select {
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .competitors-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .progress-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .results-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .results-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .results-subtitle {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+
+        .confidence-badge {
+            background: rgba(34, 197, 94, 0.1);
+            color: #16a34a;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .insights-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+
+        .insight-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .insight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .insight-category {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .priority-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .priority-high {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+
+        .priority-medium {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+        }
+
+        .priority-low {
+            background: rgba(34, 197, 94, 0.1);
+            color: #16a34a;
+        }
+
+        .insight-recommendation {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-rationale {
+            color: #64748b;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .data-sources {
+            margin-top: 2rem;
+        }
+
+        .source-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .source-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .source-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .source-type {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .source-url {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+
+        .confidence-score {
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+        }
+
+        .confidence-high {
+            background: rgba(34, 197, 94, 0.1);
+            color: #16a34a;
+        }
+
+        .confidence-medium {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+        }
+
+        .confidence-low {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .competitors-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                padding: 1rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
 </head>
 <body>
-  <!-- background depth -->
-  <div class="bg">
-    <div class="blob b1"></div>
-    <div class="blob b2"></div>
-    <div class="blob b3"></div>
-  </div>
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="logo">
-      <span class="mark">S</span>
-      <span class="word">Signal & Scale</span>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">S&S</div>
+            <div>
+                <div>Signal & Scale</div>
+                <div style="font-size: 0.75rem; font-weight: 400; color: #64748b;">Dynamic Brand Intelligence Platform</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="plan-badge">Professional Plan</div>
+            <button class="new-analysis-btn" onclick="resetForm()">+ New Analysis</button>
+        </div>
     </div>
 
-    <nav class="nav">
-      <button class="navbtn active" data-page="dashboard">Dashboard</button>
-      <button class="navbtn" data-page="report">Report</button>
-    </nav>
+    <div class="container">
+        <div class="analysis-form" id="analysisForm">
+            <h2 class="form-title">Dynamic Brand Intelligence Analysis</h2>
+            <p class="form-subtitle">Enter your brand details to generate comprehensive competitive intelligence with real-time data</p>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Brand Name *</label>
+                    <input type="text" class="form-input" id="brandName" placeholder="e.g., Supreme, Nike, Off-White">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Brand Website</label>
+                    <input type="url" class="form-input" id="brandWebsite" placeholder="https://yourbrand.com">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label class="form-label">Competitors (up to 5)</label>
+                    <div class="competitors-grid">
+                        <input type="text" class="form-input" id="competitor1" placeholder="Competitor 1">
+                        <input type="text" class="form-input" id="competitor2" placeholder="Competitor 2">
+                        <input type="text" class="form-input" id="competitor3" placeholder="Competitor 3">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Analysis Type</label>
+                    <select class="form-select" id="analysisType">
+                        <option value="complete_analysis">Complete Analysis</option>
+                        <option value="weekly_report">Weekly Report</option>
+                        <option value="cultural_radar">Cultural Radar</option>
+                        <option value="peer_tracker">Peer Tracker</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button class="analyze-btn" onclick="startAnalysis()">
+                ▶ Start Dynamic Analysis
+            </button>
+        </div>
 
-    <div class="sidefoot">
-      <span class="pill">Private • Confidential</span>
-    </div>
-  </aside>
+        <div class="progress-section" id="progressSection">
+            <h3 class="progress-title">Analyzing Brand Intelligence</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-text" id="progressText">Initializing dynamic analysis...</p>
+        </div>
 
-  <!-- MAIN -->
-  <main class="main">
-    <div class="top">
-      <div>
-        <h1>Competitive Intelligence</h1>
-        <p class="sub">Enter a brand and competitors. Get prioritized moves.</p>
-      </div>
-      <div class="act">
-        <button id="exportBtn" class="btn">Export CSV</button>
-        <button id="printBtn" class="btn accent">Export PDF</button>
-      </div>
-    </div>
-
-    <!-- DASHBOARD -->
-    <section id="dashboard" class="page show">
-      <div class="grid">
-        <!-- LEFT: inputs -->
-        <div class="card">
-          <div class="sect">Inputs</div>
-          <form class="form" onsubmit="return false;">
-            <div class="row">
-              <div class="field">
-                <label for="brandName">Brand name</label>
-                <input id="brandName" class="input" placeholder="e.g., Crooks & Castles" />
-              </div>
-              <div class="field">
-                <label for="brandUrl">Brand site (optional)</label>
-                <input id="brandUrl" class="input" placeholder="https://example.com" />
-              </div>
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <div>
+                    <h2 class="results-title" id="resultsTitle">Brand Intelligence Report for Nike</h2>
+                    <p class="results-subtitle" id="resultsSubtitle">Generated: 9/18/2025, 4:21:31 PM</p>
+                </div>
+                <button class="export-btn" id="exportPdfBtn">📄 Export PDF</button>
             </div>
 
-            <div class="field full">
-              <label for="competitors">Competitors (one per line, “Name | URL”)</label>
-              <textarea id="competitors" class="input area" placeholder="Stüssy | https://www.stussy.com
-HUF | https://hufworldwide.com"></textarea>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="activeCreators">90</div>
+                    <div class="metric-label">Active Creators</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="avgInfluenceScore">10,177,402</div>
+                    <div class="metric-label">Avg Influence Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="competitiveScore">8.2</div>
+                    <div class="metric-label">Competitive Score</div>
+                </div>
             </div>
 
-            <div class="keyrow">
-              <label for="apiKey" style="margin:0">API key (optional)</label>
-              <input id="apiKey" class="input" style="max-width:340px" placeholder="stored locally" />
-              <span class="status">Saved in this browser only</span>
+            <div class="confidence-badge" id="confidenceBadge">
+                ✓ Real-time Data Quality: 56% confidence
             </div>
-<label class="toggle">
-  <input type="checkbox" id="debugToggle" />
-  <span>Show raw JSON</span>
-</label>
 
-            <div class="row">
-              <button id="analyzeBtn" class="btn accent wide">Run Analysis</button>
-              <button id="clearBtn" class="btn subtle">Clear</button>
+            <div class="insights-section">
+                <h3 class="section-title">Prioritized Strategic Insights</h3>
+                <div id="strategicInsights">
+                    <!-- Dynamic insights will be loaded here -->
+                </div>
             </div>
-          </form>
 
-          <div class="sect" style="margin-top:18px">Results (raw)</div>
-          <pre id="result" class="u-card" style="padding:14px; white-space:pre-wrap; min-height:120px; overflow:auto;">—</pre>
+            <div class="data-sources">
+                <h3 class="section-title">Real-time Data Sources</h3>
+                <div id="dataSources">
+                    <!-- Dynamic data sources will be loaded here -->
+                </div>
+            </div>
         </div>
-
-        <!-- RIGHT: KPIs + chart -->
-        <div class="card">
-          <div class="sect">Overview</div>
-          <div class="kvs">
-            <div class="kv"><div class="kvl">Signals</div><div id="kpiSignals" class="kvv">0</div></div>
-            <div class="kv"><div class="kvl">Competitors</div><div id="kpiComps" class="kvv">0</div></div>
-            <div class="kv"><div class="kvl">Strength</div><div id="kpiStrength" class="kvv">—</div></div>
-            <div class="kv"><div class="kvl">Gaps</div><div id="kpiGaps" class="kvv">—</div></div>
-          </div>
-          <div class="chart">
-            <canvas id="chartByCompetitor"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- REPORT -->
-    <section id="report" class="page">
-      <div class="card report">
-        <div class="report-head">
-          <h2>Executive Summary</h2>
-          <span class="badge">Board-Ready</span>
-        </div>
-
-        <div class="report-grid">
-          <div class="block">
-            <h3>Top Strengths</h3>
-            <ul id="repStrengths" class="list"><li class="muted">Run an analysis to populate.</li></ul>
-          </div>
-          <div class="block">
-            <h3>Key Gaps</h3>
-            <ul id="repGaps" class="list"><li class="muted">Run an analysis to populate.</li></ul>
-          </div>
-          <div class="block span2">
-            <h3>Priority Moves (30 days)</h3>
-            <ol id="repPriorities" class="list"><li class="muted">Run an analysis to populate.</li></ol>
-          </div>
-        </div>
-
-        <div class="report-foot">
-          <span class="muted">Signal & Scale — Confidential</span>
-          <span class="muted" id="repTimestamp">—</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Print cover + chrome (populated via JS/CSS at print) -->
-    <div id="printCover" class="print-only">
-      <div class="cover-wrap">
-        <div class="cover-top">
-          <div class="cover-logo">
-            <span class="cover-mark">S</span>
-            <span class="cover-name">Signal & Scale</span>
-          </div>
-          <div class="cover-meta">
-            <div id="coverBrand">—</div>
-            <div id="coverSubtitle">Competitive Intelligence Report</div>
-            <div id="coverDate">—</div>
-          </div>
-        </div>
-        <div class="cover-accent"></div>
-      </div>
     </div>
-    <div class="print-only print-chrome">
-      <div class="print-header">
-        <div class="ph-left">
-          <span class="ph-dot"></span>
-          <span id="ph-title">Signal & Scale — Competitive Report</span>
-        </div>
-        <div class="ph-right" id="ph-date">—</div>
-      </div>
-      <div class="print-footer">
-        <div class="pf-left">Confidential</div>
-        <div class="pf-right">signal-scale.app</div>
-      </div>
-    </div>
-  </main>
+
+    <script>
+        let currentBrandName = '';
+
+        function resetForm() {
+            document.getElementById('analysisForm').style.display = 'block';
+            document.getElementById('progressSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            
+            // Clear form
+            document.getElementById('brandName').value = '';
+            document.getElementById('brandWebsite').value = '';
+            document.getElementById('competitor1').value = '';
+            document.getElementById('competitor2').value = '';
+            document.getElementById('competitor3').value = '';
+            document.getElementById('analysisType').value = 'complete_analysis';
+        }
+
+        async function startAnalysis() {
+            const brandName = document.getElementById('brandName').value.trim();
+            const brandWebsite = document.getElementById('brandWebsite').value.trim();
+            const competitors = [
+                document.getElementById('competitor1').value.trim(),
+                document.getElementById('competitor2').value.trim(),
+                document.getElementById('competitor3').value.trim()
+            ].filter(c => c.length > 0);
+            const analysisType = document.getElementById('analysisType').value;
+
+            if (!brandName) {
+                alert('Please enter a brand name');
+                return;
+            }
+
+            currentBrandName = brandName;
+
+            // Hide form and show progress
+            document.getElementById('analysisForm').style.display = 'none';
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+
+            try {
+                // Start progress animation
+                animateProgress();
+                
+                // Call API - Updated to work with your repository structure
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        brand_name: brandName,
+                        brand_website: brandWebsite,
+                        competitors: competitors,
+                        analysis_type: analysisType
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                alert('Analysis failed. Please try again.');
+                resetForm();
+            }
+        }
+
+        function animateProgress() {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            const steps = [
+                { progress: 20, text: 'Collecting social media data...' },
+                { progress: 40, text: 'Analyzing competitor intelligence...' },
+                { progress: 60, text: 'Processing creator insights...' },
+                { progress: 80, text: 'Generating strategic recommendations...' },
+                { progress: 100, text: 'Finalizing report...' }
+            ];
+
+            let currentStep = 0;
+            
+            const interval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    const step = steps[currentStep];
+                    progressFill.style.width = step.progress + '%';
+                    progressText.textContent = step.text;
+                    currentStep++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 800);
+        }
+
+        function displayResults(data) {
+            // Hide progress and show results
+            document.getElementById('progressSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            // Update header
+            document.getElementById('resultsTitle').textContent = `Brand Intelligence Report for ${data.brand_name}`;
+            document.getElementById('resultsSubtitle').textContent = `Generated: ${data.generated_at}`;
+
+            // Update metrics
+            document.getElementById('activeCreators').textContent = data.active_creators;
+            document.getElementById('avgInfluenceScore').textContent = data.avg_influence_score.toLocaleString();
+            document.getElementById('competitiveScore').textContent = data.competitive_score;
+
+            // Update confidence badge
+            document.getElementById('confidenceBadge').innerHTML = `✓ Real-time Data Quality: ${data.data_confidence}% confidence`;
+
+            // Display strategic insights
+            const insightsContainer = document.getElementById('strategicInsights');
+            insightsContainer.innerHTML = '';
+            
+            data.strategic_insights.forEach(insight => {
+                const priorityClass = insight.priority.toLowerCase().includes('high') ? 'priority-high' : 
+                                    insight.priority.toLowerCase().includes('medium') ? 'priority-medium' : 'priority-low';
+                
+                const insightCard = document.createElement('div');
+                insightCard.className = 'insight-card';
+                insightCard.innerHTML = `
+                    <div class="insight-header">
+                        <div class="insight-category">${insight.category}</div>
+                        <div class="priority-badge ${priorityClass}">${insight.priority}</div>
+                    </div>
+                    <div class="insight-recommendation"><strong>Recommendation:</strong> ${insight.recommendation}</div>
+                    <div class="insight-rationale"><strong>Rationale:</strong> ${insight.rationale}</div>
+                `;
+                insightsContainer.appendChild(insightCard);
+            });
+
+            // Display data sources
+            const sourcesContainer = document.getElementById('dataSources');
+            sourcesContainer.innerHTML = '';
+            
+            data.data_sources.forEach(source => {
+                const confidenceClass = source.confidence >= 0.8 ? 'confidence-high' : 
+                                      source.confidence >= 0.4 ? 'confidence-medium' : 'confidence-low';
+                const confidenceText = `${Math.round(source.confidence * 100)}% confidence`;
+                
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'source-item';
+                sourceItem.innerHTML = `
+                    <div class="source-info">
+                        <div class="source-name">${source.source}</div>
+                        <div class="source-type">${source.type}</div>
+                        <a href="${source.url}" class="source-url" target="_blank">${source.url}</a>
+                    </div>
+                    <div class="confidence-score ${confidenceClass}">${confidenceText}</div>
+                `;
+                sourcesContainer.appendChild(sourceItem);
+            });
+        }
+
+        // PDF Export functionality
+        document.getElementById('exportPdfBtn').addEventListener('click', async () => {
+            if (!currentBrandName) return;
+            
+            try {
+                const response = await fetch(`/api/export-pdf/${currentBrandName}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `${currentBrandName}_report.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    throw new Error('PDF export failed');
+                }
+            } catch (error) {
+                console.error('PDF export error:', error);
+                alert('PDF export failed. Please try again.');
+            }
+        });
+    </script>
 </body>
 </html>
