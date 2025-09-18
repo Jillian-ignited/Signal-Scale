@@ -1,61 +1,186 @@
-/* ===== Signal & Scale Design Tokens ===== */
+/* ==========================================================================
+   Signal & Scale — Design Tokens (theme.css)
+   Single source of truth for colors, type, spacing, radius, shadows, motion.
+   Dark = default. Light = add .theme-light to <html>.
+   ========================================================================== */
+
+/* ---------- Core Tokens (Dark) ---------- */
 :root {
-  /* Core palette */
+  /* Palette */
   --bg: #070a12;
   --bg-2: #0b0f19;
-  --surface: #0d1222;          /* glass base */
-  --ink: #edf2f9;              /* primary text */
+  --surface: #0d1222;         /* card/glass base */
+  --ink: #edf2f9;             /* primary text */
   --muted: #a7b4c8;
   --line: #212a3d;
 
   /* Brand accents */
-  --accent: #d4af37;           /* Scale Gold */
-  --accent-ink: #0e0a04;       /* for text on gold */
-  --action: #2f89ff;           /* Signal Blue */
+  --accent: #d4af37;          /* luxury gold */
+  --accent-ink: #0e0a04;      /* readable on gold */
+  --action: #2f89ff;          /* signal blue */
   --action-ink: #061126;
 
-  /* Success / warn (subtle) */
+  /* Semantic */
   --ok: #78e2b7;
   --warn: #ffd166;
   --bad: #ff7b7b;
+  --info: #7bb1ff;
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fs-1: 12px;
+  --fs-2: 13px;
+  --fs-3: 14.5px;
+  --fs-4: 16px;
+  --fs-5: 18px;
+  --fs-6: 20px;
+  --fs-7: 24px;
+
+  /* Spacing (8px grid-ish) */
+  --s-1: 6px;  --s-2: 10px; --s-3: 14px; --s-4: 16px; --s-5: 20px; --s-6: 28px; --s-7: 36px;
+
+  /* Radius */
+  --r-lg: 16px;
+  --r-md: 12px;
+  --r-sm: 10px;
+  --r-xs: 8px;
 
   /* Elevation */
   --glass: rgba(13, 18, 34, 0.78);
   --shadow-soft: 0 20px 60px rgba(0,0,0,.35);
   --ring: 0 0 0 1px var(--line) inset;
 
-  /* Typo */
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  /* Scale */
-  --radius: 16px;
-  --radius-sm: 12px;
-  --radius-xs: 10px;
-  --space-1: 6px; --space-2: 10px; --space-3: 14px; --space-4: 16px; --space-5: 20px; --space-6: 28px;
-
-  /* Chart defaults */
+  /* Charts */
   --chart-bars: var(--accent);
   --chart-grid: #24314a;
   --chart-ink: var(--ink);
 
-  /* Print overrides will come from styles.css @media print */
+  /* Motion */
+  --easing: cubic-bezier(.22,.61,.36,1);
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 340ms;
+
+  /* Layout helpers */
+  --container-max: 1200px;
+  --sidebar-w: 270px;
 }
 
-/* ===== Optional Light Theme ===== */
+/* ---------- Light Theme (opt-in) ---------- */
 :root.theme-light {
-  --bg: #fff;
+  --bg: #ffffff;
   --bg-2: #f7f8fb;
   --surface: #fffffff2;
   --ink: #0e1320;
   --muted: #5f6b7c;
   --line: #e5e7eb;
+
   --accent: #b38728;
   --accent-ink: #0e0a04;
   --action: #2563eb;
-  --action-ink: #f1f5ff;
-  --glass: rgba(255,255,255,0.82);
+  --action-ink: #f0f5ff;
+
+  --glass: rgba(255,255,255,0.85);
   --shadow-soft: 0 12px 40px rgba(2,6,23,.08);
-  --ring: 0 0 0 1px var(--line) inset;
+
   --chart-grid: #e8edf4;
 }
+
+/* ---------- Utility Classes (optional, non-intrusive) ---------- */
+/* Use these anywhere without touching component CSS. */
+
+.u-glass {
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.u-card {
+  background: #0c1326;            /* tuned dark-surface card */
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.u-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 10px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--line); background: #121a30; color: var(--ink);
+  font-weight: 800; letter-spacing: .2px; cursor: pointer;
+  transition: filter var(--dur-2) var(--easing), transform var(--dur-1) var(--easing);
+}
+.u-btn:hover { filter: brightness(1.08) }
+.u-btn:active { transform: translateY(1px) }
+.u-btn--accent {
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 80%, black));
+  border-color: transparent; color: var(--accent-ink);
+}
+.u-btn--subtle { background: #0f1628 }
+
+.u-input {
+  width: 100%; background: #0a0f1e; color: var(--ink);
+  border-radius: var(--r-md); padding: 12px;
+  border: 1px solid var(--line); outline: none; box-shadow: var(--ring);
+  transition: box-shadow var(--dur-2) var(--easing), border-color var(--dur-2) var(--easing);
+}
+.u-input:focus {
+  border-color: var(--action);
+  box-shadow: 0 0 0 1px var(--action) inset, 0 0 0 2px color-mix(in oklab, var(--action) 25%, transparent);
+}
+
+.u-badge {
+  display: inline-block; padding: 6px 10px; border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 82%, black));
+  color: var(--accent-ink); font-weight: 800;
+}
+
+.u-kv {
+  background: #0c1326; border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 12px;
+}
+.u-kv__label { color: #a7b4c8; font-size: var(--fs-1) }
+.u-kv__value { font-family: var(--font-mono); font-weight: 800; font-size: var(--fs-4); margin-top: 4px }
+
+.u-table {
+  width: 100%; border-collapse: collapse;
+}
+.u-table th, .u-table td {
+  border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top;
+}
+.u-table th { color: #cad6ea; font-weight: 800 }
+
+/* Skeleton loading */
+.u-skel {
+  position: relative; overflow: hidden; background: #0e1426; border-radius: var(--r-sm);
+}
+.u-skel::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, #ffffff10, transparent);
+  animation: skel 1.2s infinite var(--easing);
+}
+@keyframes skel { 0% { transform: translateX(-100%) } 100% { transform: translateX(100%) } }
+
+/* Print helpers pick up tokens from here (used in styles.css @media print) */
+:root {
+  --print-ink: #111;        /* body text on white */
+  --print-line: #e5e7eb;    /* table borders */
+  --print-accent: var(--accent);
+  --print-brand: "Signal & Scale";
+}
+
+/* Optional: focus ring for keyboard nav accessibility */
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--action) 80%, white);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* Minimal scrollbar polish (Chromium/WebKit) */
+*::-webkit-scrollbar { height: 10px; width: 10px }
+*::-webkit-scrollbar-thumb {
+  background: #24314a; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: #2c3a57 }
+
+/* End theme.css */
