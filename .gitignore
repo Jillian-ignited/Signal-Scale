@@ -30,3 +30,5 @@ Thumbs.db
 # Render/Build
 .cache/
 
+
+frontend/dist
