@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signal & Scale - Comprehensive Brand Intelligence Platform</title>
+    <title>Signal & Scale - Enterprise Brand Intelligence Platform</title>
     <style>
         * {
             margin: 0;
@@ -469,7 +469,7 @@
             <div class="logo-icon">S&S</div>
             <div>
                 <div>Signal & Scale</div>
-                <div style="font-size: 0.75rem; font-weight: 400; color: #64748b;">Comprehensive Brand Intelligence Platform</div>
+                <div style="font-size: 0.75rem; font-weight: 400; color: #64748b;">Enterprise Brand Intelligence Platform v2.0</div>
             </div>
         </div>
         <div class="header-actions">
@@ -480,8 +480,8 @@
 
     <div class="container">
         <div class="analysis-form" id="analysisForm">
-            <h2 class="form-title">Comprehensive Brand Intelligence Analysis</h2>
-            <p class="form-subtitle">Enter your brand details to generate investment-grade competitive intelligence with strategic insights</p>
+            <h2 class="form-title">Real-Time Brand Intelligence Analysis</h2>
+            <p class="form-subtitle">Generate investment-grade competitive intelligence with live data from Twitter, YouTube, TikTok, and Reddit APIs</p>
             
             <div class="form-grid">
                 <div class="form-group">
@@ -515,16 +515,16 @@
             </div>
             
             <button class="analyze-btn" onclick="startAnalysis()">
-                ▶ Start Comprehensive Analysis
+                ▶ Start Real-Time Analysis
             </button>
         </div>
 
         <div class="progress-section" id="progressSection">
-            <h3 class="progress-title">Analyzing Brand Intelligence</h3>
+            <h3 class="progress-title">Analyzing Brand Intelligence with Live APIs</h3>
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
-            <p class="progress-text" id="progressText">Initializing comprehensive analysis...</p>
+            <p class="progress-text" id="progressText">Initializing real-time data collection...</p>
         </div>
 
         <div class="results-section" id="resultsSection">
@@ -560,7 +560,7 @@
             </div>
 
             <div class="platform-metrics">
-                <h3 class="section-title">Platform Performance Analysis</h3>
+                <h3 class="section-title">Live Platform Performance Analysis</h3>
                 <div class="platform-grid" id="platformGrid">
                     <!-- Dynamic platform metrics will be loaded here -->
                 </div>
@@ -625,7 +625,7 @@
                 // Start progress animation
                 animateProgress();
                 
-                // Call API
+                // Call API - Production endpoint
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: {
@@ -658,11 +658,11 @@
             const progressText = document.getElementById('progressText');
             
             const steps = [
-                { progress: 20, text: 'Collecting comprehensive brand data...' },
-                { progress: 40, text: 'Analyzing platform performance...' },
-                { progress: 60, text: 'Processing competitive intelligence...' },
-                { progress: 80, text: 'Generating strategic insights...' },
-                { progress: 100, text: 'Finalizing comprehensive report...' }
+                { progress: 20, text: 'Connecting to Twitter API v2...' },
+                { progress: 40, text: 'Fetching YouTube channel analytics...' },
+                { progress: 60, text: 'Processing TikTok engagement data...' },
+                { progress: 80, text: 'Analyzing Reddit community sentiment...' },
+                { progress: 100, text: 'Generating strategic insights...' }
             ];
 
             let currentStep = 0;
@@ -744,7 +744,7 @@
                 insightCard.innerHTML = `
                     <div class="insight-header">
                         <div class="insight-category">${insight.category}</div>
-                        <div class="priority-badge ${priorityClass}">${insight.priority} Priority</div>
+                        <div class="priority-badge ${priorityClass}">${insight.priority}</div>
                     </div>
                     <div class="insight-content">
                         <div class="insight-recommendation"><strong>Strategic Insight:</strong> ${insight.insight}</div>
@@ -806,7 +806,7 @@
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = `${currentBrandName}_Comprehensive_Brand_Intelligence_Report.pdf`;
+                    a.download = `${currentBrandName}_Enterprise_Brand_Intelligence_Report.pdf`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
