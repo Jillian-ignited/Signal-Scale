@@ -1,144 +1,155 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+/* ==========================================================================
+   Signal & Scale — Application Styles (styles.css)
+   Uses tokens from theme.css. Dark app, white report exports.
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 @import "./theme.css";
 
-/* Background + type */
+/* ========= Base ========= */
 * { box-sizing: border-box }
-html,body { height: 100% }
+html, body { height: 100% }
 body {
   margin: 0;
   color: var(--ink);
-  font: 14.5px/1.6 var(--font-sans);
+  font: var(--fs-3)/1.6 var(--font-sans);
   background:
-    radial-gradient(1100px 720px at 70% -10%, #15243f 0, transparent 60%),
+    radial-gradient(1200px 760px at 72% -10%, #16264a 0, transparent 56%),
     linear-gradient(180deg, var(--bg), var(--bg-2));
   overflow-y: overlay;
 }
+a { color: var(--action); text-decoration: none }
+a:hover { text-decoration: underline }
 
-/* Soft animated blobs for depth (optional) */
-.bg { position: fixed; inset: 0; z-index: -2; filter: blur(40px) saturate(120%); pointer-events: none; }
-.bg .blob { position: absolute; width: 40vw; height: 40vw; border-radius: 50%; opacity: .38; mix-blend-mode: screen; }
-.blob.b1 { left: -8vw; top: -10vh; background: radial-gradient(closest-side,#19305a,transparent) }
-.blob.b2 { right: -12vw; top: 8vh; background: radial-gradient(closest-side,#215bde22,#0bbd7f33) }
-.blob.b3 { left: 24vw; bottom: -18vh; background: radial-gradient(closest-side,#8353ff22,transparent) }
+/* Decorative depth */
+.bg { position: fixed; inset: 0; z-index: -2; filter: blur(42px) saturate(120%); pointer-events: none }
+.bg .blob { position: absolute; width: 44vw; height: 44vw; border-radius: 50%; opacity: .34; mix-blend-mode: screen }
+.blob.b1 { left: -10vw; top: -14vh; background: radial-gradient(closest-side,#1a315c,transparent) }
+.blob.b2 { right: -14vw; top: 10vh; background: radial-gradient(closest-side,#215bde22,#0bbd7f33) }
+.blob.b3 { left: 26vw; bottom: -20vh; background: radial-gradient(closest-side,#8353ff22,transparent) }
 
-/* Glass containers */
-.glass {
-  background: var(--glass);
-  backdrop-filter: blur(14px) saturate(120%);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-soft);
-}
+/* ========= Layout shell ========= */
+.container { max-width: var(--container-max); margin: 0 auto; padding: var(--s-5) }
 
-/* Layout */
 .sidebar {
-  position: fixed; inset: var(--space-4) auto var(--space-4) var(--space-4);
-  width: 270px; padding: var(--space-4);
-  display: flex; flex-direction: column; gap: var(--space-4);
+  position: fixed; inset: var(--s-4) auto var(--s-4) var(--s-4);
+  width: var(--sidebar-w);
+  padding: var(--s-4);
+  display: flex; flex-direction: column; gap: var(--s-4);
+  background: var(--glass); backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-soft);
 }
-.logo { font-weight: 800; letter-spacing: .2px; font-size: 20px; display: flex; align-items: center; gap: 10px }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .2px; font-size: var(--fs-5) }
 .logo .mark {
-  display: inline-grid; place-items: center; width: 28px; height: 28px;
-  border-radius: 8px; background: linear-gradient(140deg, #2a906c, var(--accent));
+  display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(140deg, #2a906c, var(--accent));
   color: var(--accent-ink); font-weight: 900;
 }
-.logo .word { opacity: .9 }
+.logo .word { opacity: .92 }
 
 .nav { display: grid; gap: 8px }
 .navbtn {
-  all: unset; cursor: pointer; padding: 10px 12px; border-radius: var(--radius-sm);
+  all: unset; cursor: pointer; padding: 10px 12px; border-radius: var(--r-md);
   border: 1px solid var(--line); background: linear-gradient(180deg,#0f1527,#0d1222);
-  color: var(--ink); font-weight: 700;
+  color: var(--ink); font-weight: 800; letter-spacing: .2px;
+  transition: filter var(--dur-2) var(--easing), transform var(--dur-1) var(--easing);
 }
 .navbtn:hover { filter: brightness(1.06) }
+.navbtn:active { transform: translateY(1px) }
 .navbtn.active {
-  background: linear-gradient(180deg, var(--accent), #b78e2a);
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 80%, black));
   color: var(--accent-ink); border-color: transparent;
 }
 
-.sidefoot { margin-top: auto }
-.pill {
-  display: inline-block; padding: 6px 10px; border-radius: 999px; background: #16223a;
-  color: #cdd8e7; font-size: 12px;
-}
+.sidefoot { margin-top: auto; color: var(--muted); font-size: var(--fs-2) }
+.pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #16223a; color: #cdd8e7; font-size: var(--fs-2) }
 
-/* Main shell */
-.main { margin-left: 310px; padding: var(--space-4) }
-.top {
-  display: flex; justify-content: space-between; align-items: center; padding: var(--space-4);
-}
-.top h1 { margin: 0; font-size: 20px }
+.main { margin-left: calc(var(--sidebar-w) + var(--s-5)); padding: var(--s-5) }
+.top { display: flex; justify-content: space-between; align-items: center; padding: var(--s-4) 0 }
+.top h1 { margin: 0; font-size: var(--fs-6) }
 .sub { margin: 6px 0 0; color: var(--muted) }
 .act { display: flex; gap: 10px }
 
-/* Grid + cards */
-.grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: var(--space-4) }
-.card { padding: var(--space-4) }
-.sect { font-weight: 800; letter-spacing: .2px; margin-bottom: 10px }
+/* ========= Cards & Sections ========= */
+.card {
+  background: var(--glass); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-soft); padding: var(--s-5);
+}
+.sect { font-weight: 800; letter-spacing: .2px; margin-bottom: 12px }
+.grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--s-5) }
 
-/* Inputs */
+/* KPI tiles */
+.kvs { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px }
+.kv { background: #0c1326; border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px }
+.kvl { color: #a7b4c8; font-size: var(--fs-1) }
+.kvv { font-size: var(--fs-4); font-weight: 800; margin-top: 4px; font-family: var(--font-mono) }
+
+/* ========= Forms ========= */
+.form { display: grid; gap: var(--s-4) }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap }
 .field { flex: 1; min-width: 0 }
 .field.full { flex-basis: 100% }
-label { display: block; font-weight: 600; color: #cbd7e8; margin-bottom: 6px }
-.input {
-  width: 100%; background: #0a0f1e; color: var(--ink); border-radius: var(--radius-sm);
-  padding: 12px; border: 1px solid var(--line); outline: none; box-shadow: var(--ring);
+label { display: block; font-weight: 700; color: #cbd7e8; margin-bottom: 6px; letter-spacing: .2px }
+.input, textarea.input {
+  width: 100%; background: #0a0f1e; color: var(--ink);
+  border-radius: var(--r-md); padding: 12px;
+  border: 1px solid var(--line); outline: none; box-shadow: var(--ring);
+  transition: box-shadow var(--dur-2) var(--easing), border-color var(--dur-2) var(--easing);
 }
-.input:focus { border-color: var(--action); box-shadow: 0 0 0 1px var(--action) inset, 0 0 0 2px #2f89ff33 }
-.area { min-height: 110px; resize: vertical }
+.input:focus, textarea.input:focus {
+  border-color: var(--action);
+  box-shadow: 0 0 0 1px var(--action) inset, 0 0 0 2px color-mix(in oklab, var(--action) 25%, transparent);
+}
+.area { min-height: 120px; resize: vertical }
 .keyrow { display: flex; gap: 8px; align-items: center }
-.status { font-size: 12px; color: var(--muted); margin-left: 6px }
+.status { font-size: var(--fs-2); color: var(--muted); margin-left: 6px }
 
-/* Buttons */
+/* ========= Buttons ========= */
 .btn {
-  background: #121a30; color: var(--ink); border: 1px solid var(--line);
-  padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 10px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--line); background: #121a30; color: var(--ink);
+  font-weight: 800; letter-spacing: .2px; cursor: pointer;
+  transition: filter var(--dur-2) var(--easing), transform var(--dur-1) var(--easing);
 }
 .btn:hover { filter: brightness(1.08) }
+.btn:active { transform: translateY(1px) }
 .btn.subtle { background: #0f1628 }
 .btn.accent {
-  background: linear-gradient(180deg, var(--accent), #b78e2a);
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 80%, black));
   color: var(--accent-ink); border-color: transparent;
 }
 .btn.wide { min-width: 160px }
 .spinner {
-  width: 16px; height: 16px; border-radius: 50%; border: 2px solid #083; border-top-color: transparent;
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid #083; border-top-color: transparent;
   display: inline-block; animation: spin .9s linear infinite; vertical-align: -3px; margin-right: 6px
 }
 @keyframes spin { to { transform: rotate(360deg) } }
 
-/* KPI tiles + chart */
-.kvs { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px }
-.kv { background: #0c1326; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px }
-.kvl { color: #a7b4c8; font-size: 12px }
-.kvv { font-size: 16px; font-weight: 800; margin-top: 4px; font-family: var(--font-mono) }
-.chart { margin-top: 14px; border-radius: var(--radius-sm); padding: 12px; background: #0c1326; border: 1px solid var(--line) }
-
-/* Table */
+/* ========= Tables ========= */
 .tablewrap { margin-top: 10px; overflow: auto }
 .table { width: 100%; border-collapse: collapse }
 .table th, .table td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top }
 .table th { color: #cad6ea; font-weight: 800 }
-.hide { display: none }
 .empty { color: var(--muted); padding: 12px 0 }
 
-/* Pages */
+/* ========= Pages / Sections visibility ========= */
 .page { display: none }
 .page.show { display: block }
+.hide { display: none !important }
 
-/* Report */
+/* ========= Report layout ========= */
 .report .report-head {
   display: flex; align-items: center; justify-content: space-between;
   padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px;
 }
 .report h2 { margin: 0 }
 .badge {
-  background: linear-gradient(180deg, var(--accent), #b78e2a);
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 82%, black));
   color: var(--accent-ink); padding: 6px 12px; border-radius: 999px; font-weight: 800;
 }
 .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
-.block { background: #0c1326; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px }
+.block { background: #0c1326; border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px }
 .block h3 { margin: 0 0 8px }
 .block.span2 { grid-column: 1 / span 2 }
 .list { margin: 0; padding-left: 18px }
@@ -148,20 +159,81 @@ label { display: block; font-weight: 600; color: #cbd7e8; margin-bottom: 6px }
 .muted { color: var(--muted) }
 .report-foot { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line) }
 
-/* Print theme */
-@media print {
-  body { background: #fff; color: #111; font: 12px/1.45 var(--font-sans) }
-  .sidebar, .top, .btn { display: none !important }
-  .main { margin: 0; padding: 0 }
-  .glass, .block { background: #fff; border: 1px solid #e5e7eb; box-shadow: none }
-  .table th, .table td { border: 1px solid #e5e7eb; color: #111 }
-}
+/* ========= Chart shells (for canvas/Chart.js/ECharts) ========= */
+.chart { margin-top: 14px; border-radius: var(--r-md); padding: 12px; background: #0c1326; border: 1px solid var(--line) }
+.chart canvas { width: 100% !important; height: 260px !important; display: block }
 
-/* Responsive */
-@media (max-width: 1180px) { .grid { grid-template-columns: 1fr } .kvs { grid-template-columns: repeat(2,1fr) } }
+/* ========= Loaders / Skeleton ========= */
+.skel { height: 14px; border-radius: var(--r-sm); background: #0e1426; position: relative; overflow: hidden }
+.skel::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, #ffffff10, transparent);
+  animation: skel 1.2s infinite var(--easing);
+}
+@keyframes skel { 0% { transform: translateX(-100%) } 100% { transform: translateX(100%) } }
+
+/* ========= Responsive ========= */
+@media (max-width: 1180px) {
+  .grid { grid-template-columns: 1fr }
+  .kvs { grid-template-columns: repeat(2,1fr) }
+}
 @media (max-width: 960px) {
-  .sidebar { position: static; width: auto; margin: var(--space-4); display: grid; grid-template-columns: 1fr auto auto; align-items: center }
+  .sidebar {
+    position: static; width: auto; margin: var(--s-4);
+    display: grid; grid-template-columns: 1fr auto auto; align-items: center;
+  }
   .main { margin: 0 }
   .nav { grid-auto-flow: column; justify-content: start }
   .sidefoot { margin: 0; justify-self: end }
+}
+
+/* ========= Print (Reports are white, branded) ========= */
+.print-only { display: none }
+@media print {
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm }
+  body { background: #fff !important; color: var(--print-ink) !important; font: 12px/1.45 var(--font-sans) !important }
+  .sidebar, .top, .btn { display: none !important }
+  .main { margin: 0; padding: 0 }
+  .card, .block { background: #fff !important; border: 1px solid var(--print-line) !important; box-shadow: none !important }
+  .table th, .table td { border: 1px solid var(--print-line) !important; color: var(--print-ink) !important }
+  .chart, .kv { border-color: var(--print-line) !important }
+  .print-only { display: block !important }
+
+  /* Cover page + chrome from previous step */
+  #printCover { page-break-after: always }
+  .cover-wrap { position: relative; height: 100vh; display: flex; flex-direction: column; justify-content: center }
+  .cover-top { max-width: 80% }
+  .cover-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 18px }
+  .cover-mark {
+    display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+    background: var(--print-accent); color: var(--accent-ink); font-weight: 900;
+  }
+  .cover-name { font-weight: 800; letter-spacing: .2px }
+  .cover-meta #coverBrand { font-weight: 800; font-size: 26px; margin-bottom: 4px }
+  .cover-meta #coverSubtitle { color: #444; margin-bottom: 8px }
+  .cover-meta #coverDate { color: #666 }
+  .cover-accent {
+    position: absolute; left: 0; bottom: 0; width: 100%; height: 8mm;
+    background: linear-gradient(90deg, var(--print-accent), color-mix(in oklab, var(--print-accent) 80%, black));
+  }
+
+  .print-chrome { position: fixed; inset: 0; pointer-events: none }
+  .print-header, .print-footer { position: fixed; left: 16mm; right: 16mm; color: #555; font-size: 11px }
+  .print-header { top: 8mm; display: flex; justify-content: space-between; align-items: center }
+  .print-footer { bottom: 8mm; display: flex; justify-content: space-between; align-items: center }
+  .ph-left { display: flex; align-items: center; gap: 8px }
+  .ph-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--print-accent); display: inline-block }
+  #ph-title { font-weight: 700 }
+  .pf-left, .pf-right { color: #888 }
+
+  /* Tighter blocks for print */
+  #report { padding: 0 }
+  #report .card { border: none; padding: 0 }
+  .report-grid { gap: 10px }
+  .block, .block.span2 { page-break-inside: avoid }
+  .report::after {
+    content: var(--print-brand);
+    position: fixed; top: 45vh; left: 0; right: 0; text-align: center;
+    font-size: 48px; letter-spacing: 2px; color: #000; opacity: 0.04; transform: rotate(-12deg);
+  }
 }
