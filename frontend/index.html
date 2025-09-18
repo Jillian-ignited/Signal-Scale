@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Signal & Scale</title>
+
+  <!-- Theme + App styles -->
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/styles.css">
+
+  <!-- Chart.js (for simple charts) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer></script>
+
+  <!-- App entry -->
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <!-- background depth -->
+  <div class="bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="mark">S</span>
+      <span class="word">Signal & Scale</span>
+    </div>
+
+    <nav class="nav">
+      <button class="navbtn active" data-page="dashboard">Dashboard</button>
+      <button class="navbtn" data-page="report">Report</button>
+    </nav>
+
+    <div class="sidefoot">
+      <span class="pill">Private • Confidential</span>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1>Competitive Intelligence</h1>
+        <p class="sub">Enter a brand and competitors. Get prioritized moves.</p>
+      </div>
+      <div class="act">
+        <button id="exportBtn" class="btn">Export CSV</button>
+        <button id="printBtn" class="btn accent">Export PDF</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="page show">
+      <div class="grid">
+        <!-- LEFT: inputs -->
+        <div class="card">
+          <div class="sect">Inputs</div>
+          <form class="form" onsubmit="return false;">
+            <div class="row">
+              <div class="field">
+                <label for="brandName">Brand name</label>
+                <input id="brandName" class="input" placeholder="e.g., Crooks & Castles" />
+              </div>
+              <div class="field">
+                <label for="brandUrl">Brand site (optional)</label>
+                <input id="brandUrl" class="input" placeholder="https://example.com" />
+              </div>
+            </div>
+
+            <div class="field full">
+              <label for="competitors">Competitors (one per line, “Name | URL”)</label>
+              <textarea id="competitors" class="input area" placeholder="Stüssy | https://www.stussy.com
+HUF | https://hufworldwide.com"></textarea>
+            </div>
+
+            <div class="keyrow">
+              <label for="apiKey" style="margin:0">API key (optional)</label>
+              <input id="apiKey" class="input" style="max-width:340px" placeholder="stored locally" />
+              <span class="status">Saved in this browser only</span>
+            </div>
+
+            <div class="row">
+              <button id="analyzeBtn" class="btn accent wide">Run Analysis</button>
+              <button id="clearBtn" class="btn subtle">Clear</button>
+            </div>
+          </form>
+
+          <div class="sect" style="margin-top:18px">Results (raw)</div>
+          <pre id="result" class="u-card" style="padding:14px; white-space:pre-wrap; min-height:120px; overflow:auto;">—</pre>
+        </div>
+
+        <!-- RIGHT: KPIs + chart -->
+        <div class="card">
+          <div class="sect">Overview</div>
+          <div class="kvs">
+            <div class="kv"><div class="kvl">Signals</div><div id="kpiSignals" class="kvv">0</div></div>
+            <div class="kv"><div class="kvl">Competitors</div><div id="kpiComps" class="kvv">0</div></div>
+            <div class="kv"><div class="kvl">Strength</div><div id="kpiStrength" class="kvv">—</div></div>
+            <div class="kv"><div class="kvl">Gaps</div><div id="kpiGaps" class="kvv">—</div></div>
+          </div>
+          <div class="chart">
+            <canvas id="chartByCompetitor"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORT -->
+    <section id="report" class="page">
+      <div class="card report">
+        <div class="report-head">
+          <h2>Executive Summary</h2>
+          <span class="badge">Board-Ready</span>
+        </div>
+
+        <div class="report-grid">
+          <div class="block">
+            <h3>Top Strengths</h3>
+            <ul id="repStrengths" class="list"><li class="muted">Run an analysis to populate.</li></ul>
+          </div>
+          <div class="block">
+            <h3>Key Gaps</h3>
+            <ul id="repGaps" class="list"><li class="muted">Run an analysis to populate.</li></ul>
+          </div>
+          <div class="block span2">
+            <h3>Priority Moves (30 days)</h3>
+            <ol id="repPriorities" class="list"><li class="muted">Run an analysis to populate.</li></ol>
+          </div>
+        </div>
+
+        <div class="report-foot">
+          <span class="muted">Signal & Scale — Confidential</span>
+          <span class="muted" id="repTimestamp">—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Print cover + chrome (populated via JS/CSS at print) -->
+    <div id="printCover" class="print-only">
+      <div class="cover-wrap">
+        <div class="cover-top">
+          <div class="cover-logo">
+            <span class="cover-mark">S</span>
+            <span class="cover-name">Signal & Scale</span>
+          </div>
+          <div class="cover-meta">
+            <div id="coverBrand">—</div>
+            <div id="coverSubtitle">Competitive Intelligence Report</div>
+            <div id="coverDate">—</div>
+          </div>
+        </div>
+        <div class="cover-accent"></div>
+      </div>
+    </div>
+    <div class="print-only print-chrome">
+      <div class="print-header">
+        <div class="ph-left">
+          <span class="ph-dot"></span>
+          <span id="ph-title">Signal & Scale — Competitive Report</span>
+        </div>
+        <div class="ph-right" id="ph-date">—</div>
+      </div>
+      <div class="print-footer">
+        <div class="pf-left">Confidential</div>
+        <div class="pf-right">signal-scale.app</div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
