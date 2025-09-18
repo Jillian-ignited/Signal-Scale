@@ -7,28 +7,33 @@ UA = {"User-Agent": "SignalScaleBot/1.0"}
 WIKI_SEARCH = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={q}&format=json&srlimit=1"
 WIKI_PAGE = "https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info|extlinks|categories&inprop=url&explaintext=1&format=json&pageids={pid}&ellimit=500&cllimit=500"
 
-def _clean_url(u: Optional[str]) -> Optional[str]:
+SKIP_DOMAINS = re.compile(r"(web\.archive\.org|facebook\.com|instagram\.com|x\.com|twitter\.com|tiktok\.com|youtube\.com|linkedin\.com|pinterest\.com)", re.I)
+
+def _clean_host(u: Optional[str]) -> Optional[str]:
     if not u: return None
     u = u.strip()
     u = re.sub(r"^https?://", "", u, flags=re.I)
     u = re.sub(r"^www\.", "", u, flags=re.I)
-    u = u.split("/")[0]
-    return u.lower() if u else None
+    u = u.split("/")[0].lower()
+    return u or None
 
-def _pick_official(extlinks) -> Optional[str]:
+def _pick_official(extlinks, brand_token: str) -> Optional[str]:
     if not isinstance(extlinks, list): return None
-    # Heuristic: prefer brand top-level domain
+    brand_token = (brand_token or "").lower()
     best = None
     for e in extlinks:
         url = e.get("*") if isinstance(e, dict) else None
-        if not url: continue
-        # ignore social domains
-        if re.search(r"(facebook|instagram|twitter|x\.com|tiktok|youtube|linkedin|pinterest)", url, re.I):
+        if not url: 
             continue
-        best = url
-        # strong hint
-        if re.search(r"\.com/?$", url): 
-            return best
+        host = _clean_host(url)
+        if not host or SKIP_DOMAINS.search(host):
+            continue
+        # strong preference: host contains the brand token (adidas -> adidas.com)
+        if brand_token and brand_token in host:
+            return host
+        # remember a fallback candidate
+        if best is None:
+            best = host
     return best
 
 def _category_from_categories(cats) -> str:
@@ -36,25 +41,17 @@ def _category_from_categories(cats) -> str:
     labels = " ".join([c.get("title","") for c in cats]).lower()
     if "streetwear" in labels: return "streetwear"
     if "athletic" in labels or "sportswear" in labels: return "athletic"
-    if "luxury" in labels or "high fashion" in labels: return "luxury"
-    if "denim" in labels: return "denim"
-    if "skateboarding" in labels: return "skate"
+    if "luxury" in labels: return "luxury"
+    if "skate" in labels: return "skate"
     return "apparel"
 
 async def resolve_brand(brand_name: str, hint_url: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Uses Wikipedia to reliably resolve:
-      - official website
-      - plain-text summary
-      - category guess
-    Works well for Nike, Stüssy, etc. Private/obscure brands fall back to hint_url.
-    """
     brand_name = (brand_name or "").strip()
+    token = re.sub(r"[^a-z0-9]+", "", brand_name.lower())[:20]
     out = {
         "resolved_name": brand_name,
-        "official_domain": _clean_url(hint_url) if hint_url else None,
-        "summary": None,
-        "category": "unknown",
+        "official_domain": _clean_host(hint_url) if hint_url else None,
+        "summary": None, "category": "unknown",
         "confidence": 0.4 if hint_url else 0.2,
         "source": "wikipedia",
     }
@@ -83,13 +80,14 @@ async def resolve_brand(brand_name: str, hint_url: Optional[str] = None) -> Dict
             extract = page.get("extract")
             extlinks = page.get("extlinks") or []
             cats = page.get("categories") or []
-            official = _pick_official(extlinks)
+
+            official = _pick_official(extlinks, token)
             if official:
-                out["official_domain"] = _clean_url(official)
+                out["official_domain"] = official
 
             out["summary"] = (extract or "")[:1200] if extract else None
             out["category"] = _category_from_categories(cats)
-            # raise confidence if we found official site + summary
+
             conf = 0.7
             if out["official_domain"] and out["summary"]:
                 conf = 0.9
