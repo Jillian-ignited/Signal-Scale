@@ -626,7 +626,7 @@
                 animateProgress();
                 
                 // Call API
-                const response = await fetch('http://localhost:8001/api/analyze', {
+                const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -799,7 +799,7 @@
             if (!currentBrandName) return;
             
             try {
-                const response = await fetch(`http://localhost:8001/api/export-pdf/${currentBrandName}`);
+                const response = await fetch(`/api/export-pdf/${currentBrandName}`);
                 if (response.ok) {
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
